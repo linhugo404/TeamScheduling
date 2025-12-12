@@ -13,6 +13,7 @@ let state = {
     selectedDate: null,
     viewers: [],
     myName: null,
+    myUserId: null,
     currentRoom: null
 };
 
@@ -71,43 +72,60 @@ function initSocket() {
         joinCurrentRoom();
     });
     
-    // Handle viewers update
-    socket.on('viewers', (viewers) => {
+    // Handle presence update (viewers list)
+    socket.on('presence:update', ({ roomKey, viewers }) => {
         state.viewers = viewers;
         renderViewers();
     });
     
-    // Handle booking changes from other users
-    socket.on('booking-created', (booking) => {
-        // Add to local state if in same location
-        if (booking.locationId === state.currentLocation) {
-            const exists = state.bookings.find(b => b.id === booking.id);
-            if (!exists) {
+    // Handle data changes from other users
+    socket.on('data:changed', ({ type, booking, before }) => {
+        console.log('Received data:changed', type, booking);
+        
+        if (type === 'booking:created' && booking) {
+            // Add to local state if in same location
+            if (booking.locationId === state.currentLocation) {
+                const exists = state.bookings.find(b => b.id === booking.id);
+                if (!exists) {
+                    state.bookings.push(booking);
+                    renderCalendar();
+                    updateCapacityDisplay();
+                    showToast(`${booking.teamName} booked by another user`, 'success');
+                }
+            }
+        } else if (type === 'booking:updated' && booking) {
+            const index = state.bookings.findIndex(b => b.id === booking.id);
+            if (index !== -1) {
+                state.bookings[index] = booking;
+                renderCalendar();
+                updateCapacityDisplay();
+                showToast(`${booking.teamName} updated`, 'success');
+            } else if (booking.locationId === state.currentLocation) {
+                // Booking moved to this month
                 state.bookings.push(booking);
                 renderCalendar();
                 updateCapacityDisplay();
-                showToast(`${booking.teamName} booked by another user`, 'success');
+            }
+        } else if (type === 'booking:moved_out' && booking) {
+            // Booking was moved out of this month/location
+            state.bookings = state.bookings.filter(b => b.id !== booking.id);
+            renderCalendar();
+            updateCapacityDisplay();
+        } else if (type === 'booking:deleted' && booking) {
+            const hadBooking = state.bookings.some(b => b.id === booking.id);
+            state.bookings = state.bookings.filter(b => b.id !== booking.id);
+            if (hadBooking) {
+                renderCalendar();
+                updateCapacityDisplay();
+                showToast(`${booking.teamName} removed`, 'success');
             }
         }
     });
     
-    socket.on('booking-updated', (booking) => {
-        const index = state.bookings.findIndex(b => b.id === booking.id);
-        if (index !== -1) {
-            state.bookings[index] = booking;
-            renderCalendar();
-            updateCapacityDisplay();
-        }
-    });
-    
-    socket.on('booking-deleted', ({ id }) => {
-        state.bookings = state.bookings.filter(b => b.id !== id);
-        renderCalendar();
-        updateCapacityDisplay();
-    });
-    
     socket.on('disconnect', () => {
         console.log('Disconnected from real-time server');
+        state.viewers = [];
+        renderViewers();
     });
 }
 
@@ -115,17 +133,28 @@ function joinCurrentRoom() {
     if (!socket || !socket.connected) return;
     
     const year = state.currentDate.getFullYear();
-    const month = state.currentDate.getMonth();
-    const room = `${state.currentLocation}-${year}-${month}`;
+    const month = String(state.currentDate.getMonth() + 1).padStart(2, '0');
+    const roomKey = `presence:${state.currentLocation}:${year}-${month}`;
     
     // Leave old room if different
-    if (state.currentRoom && state.currentRoom !== room) {
-        socket.emit('leave-room', state.currentRoom);
+    if (state.currentRoom && state.currentRoom !== roomKey) {
+        socket.emit('presence:leave', { roomKey: state.currentRoom });
+    }
+    
+    // Generate a unique user ID if we don't have one
+    if (!state.myUserId) {
+        state.myUserId = 'user-' + Math.random().toString(36).substr(2, 9);
     }
     
     // Join new room
-    socket.emit('join-room', { room, name: state.myName });
-    state.currentRoom = room;
+    socket.emit('presence:join', { 
+        roomKey, 
+        user: { 
+            id: state.myUserId, 
+            name: state.myName 
+        } 
+    });
+    state.currentRoom = roomKey;
 }
 
 function renderViewers() {

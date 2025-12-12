@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Office Booking System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <div class="app">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                </div>
+                <span>Office Booking</span>
+                <button id="themeToggle" class="theme-toggle" title="Toggle theme">
+                    <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                    <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="location-selector">
+                <label>Location</label>
+                <select id="locationSelect">
+                    <!-- Populated dynamically -->
+                </select>
+            </div>
+            
+            <div class="capacity-display">
+                <div class="capacity-header">
+                    <span>Today's Capacity</span>
+                    <span id="capacityLabel" class="capacity-badge">0/21</span>
+                </div>
+                <div class="capacity-bar">
+                    <div id="capacityFill" class="capacity-fill" style="width: 0%"></div>
+                </div>
+            </div>
+            
+            <nav class="nav-menu">
+                <button class="nav-item active" data-view="calendar">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    Calendar
+                </button>
+                <button class="nav-item" data-view="teams">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                    Teams
+                </button>
+                <button class="nav-item" data-view="locations">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                        <circle cx="12" cy="10" r="3"></circle>
+                    </svg>
+                    Locations
+                </button>
+                <button class="nav-item" data-view="holidays">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                        <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"></path>
+                    </svg>
+                    Holidays
+                </button>
+            </nav>
+            
+            <div class="teams-legend" id="teamsLegend">
+                <h4>Teams</h4>
+                <!-- Populated dynamically -->
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Calendar View -->
+            <div id="calendarView" class="view active">
+                <header class="view-header">
+                    <div class="month-navigation">
+                        <button id="prevMonth" class="nav-btn">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="15 18 9 12 15 6"></polyline>
+                            </svg>
+                        </button>
+                        <h1 id="currentMonth">January 2026</h1>
+                        <button id="nextMonth" class="nav-btn">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="calendar-header-right">
+                        <div class="presence" id="presenceBar">
+                            <span class="presence-label">Viewing this month:</span>
+                            <div class="presence-avatars" id="presenceAvatars"></div>
+                            <span class="presence-count" id="presenceCount">0</span>
+                        </div>
+                        <button id="todayBtn" class="btn btn-secondary">Today</button>
+                    </div>
+                </header>
+                
+                <div class="calendar-container">
+                    <div class="calendar-header">
+                        <div class="calendar-day-header">Mon</div>
+                        <div class="calendar-day-header">Tue</div>
+                        <div class="calendar-day-header">Wed</div>
+                        <div class="calendar-day-header">Thu</div>
+                        <div class="calendar-day-header">Fri</div>
+                        <div class="calendar-day-header weekend">Sat</div>
+                        <div class="calendar-day-header weekend">Sun</div>
+                    </div>
+                    <div id="calendarGrid" class="calendar-grid">
+                        <!-- Calendar days populated by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Teams View -->
+            <div id="teamsView" class="view">
+                <header class="view-header">
+                    <h1>Manage Teams</h1>
+                    <button id="addTeamBtn" class="btn btn-primary">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        Add Team
+                    </button>
+                </header>
+                <div id="teamsList" class="teams-list">
+                    <!-- Teams populated by JS -->
+                </div>
+            </div>
+
+            <!-- Locations View -->
+            <div id="locationsView" class="view">
+                <header class="view-header">
+                    <h1>Manage Locations</h1>
+                    <button id="addLocationBtn" class="btn btn-primary">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        Add Location
+                    </button>
+                </header>
+                <div id="locationsList" class="locations-list">
+                    <!-- Locations populated by JS -->
+                </div>
+            </div>
+
+            <!-- Holidays View -->
+            <div id="holidaysView" class="view">
+                <header class="view-header">
+                    <h1>Public Holidays</h1>
+                    <div class="holiday-actions">
+                        <select id="holidayYear" class="year-select">
+                            <!-- Populated by JS -->
+                        </select>
+                        <button id="fetchHolidaysBtn" class="btn btn-primary">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c1.66 0 3-4.03 3-9s-1.34-9-3-9m0 18c-1.66 0-3-4.03-3-9s1.34-9 3-9"></path>
+                            </svg>
+                            Fetch SA Holidays
+                        </button>
+                    </div>
+                </header>
+                <p class="view-description">Public holidays are excluded from bookings. Use the button above to fetch official South African holidays from the internet.</p>
+                <div id="holidaysList" class="holidays-list">
+                    <!-- Holidays populated by JS -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Booking Modal -->
+    <div id="bookingModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Book Office Space</h2>
+                <button class="modal-close" onclick="closeModal()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <form id="bookingForm">
+                <input type="hidden" id="bookingId">
+                <input type="hidden" id="bookingDate">
+                
+                <div class="form-group">
+                    <label>Date</label>
+                    <div id="selectedDate" class="selected-date"></div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="teamSelect">Team</label>
+                    <select id="teamSelect" required>
+                        <!-- Populated dynamically -->
+                    </select>
+                </div>
+                
+                <div class="form-group" id="peopleCountGroup" style="display: none;">
+                    <label for="peopleCount">Number of People</label>
+                    <input type="number" id="peopleCount" min="1" max="21" value="1" required>
+                    <span id="availableSpots" class="hint"></span>
+                </div>
+                
+                <div class="form-group" id="teamMemberInfo">
+                    <label>Team Info</label>
+                    <div id="teamMemberCount" class="selected-date"></div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="bookingNotes">Notes (optional)</label>
+                    <textarea id="bookingNotes" rows="2" placeholder="Any additional notes..."></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Booking</button>
+                </div>
+            </form>
+            
+            <!-- Existing bookings for this day -->
+            <div id="dayBookings" class="day-bookings">
+                <h3>Bookings for this day</h3>
+                <div id="dayBookingsList"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Team Modal -->
+    <div id="teamModal" class="modal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2>Add Team</h2>
+                <button class="modal-close" onclick="closeTeamModal()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <form id="teamForm">
+                <input type="hidden" id="editTeamId">
+                <div class="form-group">
+                    <label for="teamLocationSelect">Office Location</label>
+                    <select id="teamLocationSelect" required>
+                        <!-- Populated dynamically -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="teamName">Team Name</label>
+                    <input type="text" id="teamName" required placeholder="e.g. Engineering">
+                </div>
+                <div class="form-group">
+                    <label for="teamManager">Manager / SM</label>
+                    <input type="text" id="teamManager" placeholder="e.g. John Smith">
+                </div>
+                <div class="form-group">
+                    <label for="teamManagerImage">Manager Photo URL</label>
+                    <input type="url" id="teamManagerImage" placeholder="https://example.com/photo.jpg">
+                    <span class="hint">Paste an image URL, or leave blank for auto-generated avatar</span>
+                </div>
+                <div class="form-group">
+                    <label for="teamMemberCountInput">Number of Team Members</label>
+                    <input type="number" id="teamMemberCountInput" min="0" max="50" value="1" required>
+                </div>
+                <div class="form-group">
+                    <label for="teamColor">Team Color</label>
+                    <input type="color" id="teamColor" value="#3B82F6">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeTeamModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="teamFormSubmitBtn">Add Team</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Location Modal -->
+    <div id="locationModal" class="modal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2 id="locationModalTitle">Add Location</h2>
+                <button class="modal-close" onclick="closeLocationModal()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <form id="locationForm">
+                <input type="hidden" id="editLocationId">
+                <div class="form-group">
+                    <label for="locationName">Location Name</label>
+                    <input type="text" id="locationName" required placeholder="e.g. London Office">
+                </div>
+                <div class="form-group">
+                    <label for="locationCapacity">Daily Capacity (max people per day)</label>
+                    <input type="number" id="locationCapacity" min="1" value="21" required>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeLocationModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="locationFormSubmitBtn">Add Location</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Team Hover Tooltip -->
+    <div id="teamTooltip" class="team-tooltip">
+        <div class="tooltip-content">
+            <div class="tooltip-avatar" id="tooltipAvatar"></div>
+            <div class="tooltip-info">
+                <span class="tooltip-team-name" id="tooltipTeamName"></span>
+                <span class="tooltip-manager" id="tooltipManager"></span>
+                <span class="tooltip-members" id="tooltipMembers"></span>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
+

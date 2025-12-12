@@ -2173,26 +2173,34 @@ function handleElementMouseMove(e) {
         let newY = dragState.initialY;
         
         const handle = dragState.resizeHandle;
+        const minWidth = 30;
+        const minHeight = 4;
         
         if (handle.includes('e')) {
-            newWidth = Math.max(30, dragState.initialWidth + deltaX);
+            // East handle: right edge moves, left edge (x) stays fixed
+            newWidth = Math.max(minWidth, dragState.initialWidth + deltaX);
         }
         if (handle.includes('w')) {
-            const widthDelta = -deltaX;
-            newWidth = Math.max(30, dragState.initialWidth + widthDelta);
-            if (newWidth > 30) {
-                newX = dragState.initialX - widthDelta;
-            }
+            // West handle: left edge moves, right edge stays fixed
+            // Calculate new width first, then derive position from it
+            const proposedWidth = dragState.initialWidth - deltaX;
+            newWidth = Math.max(minWidth, proposedWidth);
+            // Position = original right edge - new width
+            const rightEdge = dragState.initialX + dragState.initialWidth;
+            newX = rightEdge - newWidth;
         }
         if (handle.includes('s')) {
-            newHeight = Math.max(4, dragState.initialHeight + deltaY);
+            // South handle: bottom edge moves, top edge (y) stays fixed
+            newHeight = Math.max(minHeight, dragState.initialHeight + deltaY);
         }
         if (handle.includes('n')) {
-            const heightDelta = -deltaY;
-            newHeight = Math.max(4, dragState.initialHeight + heightDelta);
-            if (newHeight > 4) {
-                newY = dragState.initialY - heightDelta;
-            }
+            // North handle: top edge moves, bottom edge stays fixed
+            // Calculate new height first, then derive position from it
+            const proposedHeight = dragState.initialHeight - deltaY;
+            newHeight = Math.max(minHeight, proposedHeight);
+            // Position = original bottom edge - new height
+            const bottomEdge = dragState.initialY + dragState.initialHeight;
+            newY = bottomEdge - newHeight;
         }
         
         // Snap to grid

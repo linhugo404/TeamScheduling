@@ -383,12 +383,13 @@ app.delete('/api/bookings/:id', async (req, res) => {
 // Manage locations
 app.post('/api/locations', async (req, res) => {
     try {
-        const { name, capacity } = req.body;
+        const { name, address, capacity } = req.body;
         const data = await readData();
         
         const newLocation = {
             id: name.toLowerCase().replace(/\s+/g, '-'),
             name,
+            address: address || '',
             capacity: parseInt(capacity) || 21
         };
         

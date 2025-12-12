@@ -645,21 +645,21 @@ body::before {
     display: flex;
     align-items: center;
     gap: 4px;
-    padding: 3px 6px;
+    padding: 4px 8px;
     border-radius: var(--radius-sm);
     font-size: 0.7rem;
+    font-weight: 500;
     color: white;
-    background: var(--bg-card);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .booking-chip-color {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    flex-shrink: 0;
+    display: none; /* Hide the dot since the chip itself is now colored */
 }
 
 .more-bookings {
@@ -838,6 +838,8 @@ form {
     background: var(--bg-card);
     border-radius: var(--radius-md);
     margin-bottom: var(--spacing-sm);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .booking-info {
@@ -874,23 +876,23 @@ form {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: transparent;
-    border: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
     border-radius: var(--radius-sm);
-    color: var(--text-muted);
+    color: white;
     cursor: pointer;
     transition: all var(--transition-fast);
 }
 
 .booking-actions button:hover {
-    background: var(--bg-tertiary);
-    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.35);
+    color: white;
 }
 
 .booking-actions button.delete:hover {
-    background: rgba(239, 68, 68, 0.1);
-    border-color: var(--danger);
-    color: var(--danger);
+    background: rgba(239, 68, 68, 0.8);
+    border-color: rgba(255, 255, 255, 0.4);
+    color: white;
 }
 
 .booking-actions button svg {
@@ -931,60 +933,97 @@ form {
 
 .teams-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: var(--spacing-lg);
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: var(--spacing-xl);
 }
 
 .locations-list {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: var(--spacing-lg);
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: var(--spacing-xl);
 }
 
 .team-card {
     background: var(--bg-card);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
-    padding: var(--spacing-lg);
     transition: all var(--transition-fast);
     display: flex;
     flex-direction: column;
+    align-items: center;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    padding-top: 0;
 }
 
 .team-card:hover {
     border-color: var(--accent-primary);
     box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
 }
 
-.team-card-header {
+.team-card-color-bar {
+    width: 100%;
+    height: 6px;
+    flex-shrink: 0;
+}
+
+.team-card-avatar-wrapper {
+    margin-top: var(--spacing-md);
+    margin-bottom: var(--spacing-sm);
+}
+
+.team-card-avatar {
+    width: 110px;
+    height: 110px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
     display: flex;
-    align-items: flex-start;
-    gap: var(--spacing-md);
+    align-items: center;
+    justify-content: center;
+    font-size: 2.25rem;
+    font-weight: 600;
+    color: white;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+    border: 4px solid var(--accent-primary);
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.team-card:hover .team-card-avatar {
+    transform: scale(1.05);
+    box-shadow: 0 6px 28px rgba(0, 0, 0, 0.35);
+}
+
+.team-card-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.team-card-body {
+    padding: 0 var(--spacing-md);
     width: 100%;
 }
 
-.team-card-info {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--spacing-md);
-    flex: 1;
-    min-width: 0;
-}
-
-.team-card-details {
-    flex: 1;
-    min-width: 0;
-}
-
 .team-name {
-    font-size: 1.1rem;
+    font-size: 1.15rem;
     font-weight: 600;
     margin-bottom: 4px;
     word-wrap: break-word;
+    color: var(--text-primary);
+}
+
+.team-manager-name {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-sm);
 }
 
 .team-meta {
     display: flex;
+    justify-content: center;
     flex-wrap: wrap;
     gap: var(--spacing-sm);
     margin-top: var(--spacing-xs);
@@ -997,69 +1036,199 @@ form {
     font-size: 0.8rem;
     color: var(--text-secondary);
     background: var(--bg-tertiary);
-    padding: 3px 8px;
+    padding: 4px 10px;
     border-radius: var(--radius-sm);
 }
 
 .team-meta-item svg {
-    width: 12px;
-    height: 12px;
+    width: 14px;
+    height: 14px;
     opacity: 0.7;
-}
-
-.team-manager-name {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-    margin-top: 2px;
 }
 
 .team-card-actions {
     display: flex;
     gap: var(--spacing-sm);
-    flex-shrink: 0;
-    margin-left: auto;
+    justify-content: center;
+    padding: var(--spacing-md);
+    width: 100%;
+    border-top: 1px solid var(--border-color);
+    margin-top: var(--spacing-md);
+    background: var(--bg-tertiary);
 }
 
 .location-card {
     background: var(--bg-card);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
-    padding: var(--spacing-lg);
     transition: all var(--transition-fast);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
 .location-card:hover {
     border-color: var(--accent-primary);
     box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
 }
 
-.location-card-header {
+.location-map {
+    width: 100%;
+    height: 180px;
+    min-height: 180px;
+    position: relative;
+    background: #1a1a2e;
+    overflow: hidden;
+}
+
+/* Leaflet map container */
+.location-map .leaflet-container {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 180px;
+    background: #1a1a2e !important;
+}
+
+.location-map > div {
+    width: 100%;
+    height: 100%;
+}
+
+/* Custom map marker */
+.custom-map-marker {
+    background: transparent !important;
+    border: none !important;
+}
+
+.custom-map-marker svg {
+    width: 32px;
+    height: 32px;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+}
+
+/* Map loading state */
+.map-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    gap: var(--spacing-sm);
+}
+
+.map-loading svg {
+    width: 24px;
+    height: 24px;
+}
+
+/* Light theme - use light tiles */
+[data-theme="light"] .location-map .leaflet-container {
+    background: #f5f5f5;
+}
+
+.map-overlay-link {
+    position: absolute;
+    top: var(--spacing-sm);
+    right: var(--spacing-sm);
+    width: 32px;
+    height: 32px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: var(--spacing-md);
+    justify-content: center;
+    color: var(--text-secondary);
+    transition: all var(--transition-fast);
+    opacity: 0;
 }
 
-.location-card-info {
-    flex: 1;
-    min-width: 0;
+.location-map:hover .map-overlay-link {
+    opacity: 1;
+}
+
+.map-overlay-link:hover {
+    background: var(--accent-primary);
+    color: white;
+    border-color: var(--accent-primary);
+}
+
+.map-overlay-link svg {
+    width: 16px;
+    height: 16px;
+}
+
+.location-map-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    color: var(--text-muted);
+}
+
+.location-map-empty svg {
+    width: 40px;
+    height: 40px;
+    opacity: 0.5;
+}
+
+.location-map-empty span {
+    font-size: 0.85rem;
+}
+
+.location-card-body {
+    padding: var(--spacing-md);
+    text-align: center;
 }
 
 .location-name {
-    font-size: 1.1rem;
+    font-size: 1.15rem;
     font-weight: 600;
+    margin-bottom: 4px;
 }
 
-.location-capacity-info {
-    font-size: 0.9rem;
+.location-address {
+    font-size: 0.85rem;
     color: var(--text-secondary);
-    margin-top: 2px;
+    margin-bottom: var(--spacing-sm);
+    line-height: 1.4;
+}
+
+.location-meta {
+    display: flex;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-xs);
+}
+
+.location-meta-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    background: var(--bg-tertiary);
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+}
+
+.location-meta-item svg {
+    width: 14px;
+    height: 14px;
+    opacity: 0.7;
 }
 
 .location-card-actions {
     display: flex;
     gap: var(--spacing-sm);
-    flex-shrink: 0;
+    justify-content: center;
+    padding: var(--spacing-md);
+    border-top: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
 }
 
 /* ============================================
@@ -1257,22 +1426,26 @@ form {
     display: flex;
     align-items: center;
     gap: 4px;
-    padding: 3px 6px;
+    padding: 4px 8px;
     border-radius: var(--radius-sm);
     font-size: 0.7rem;
+    font-weight: 500;
     color: white;
-    background: var(--bg-card);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     cursor: pointer;
     transition: all var(--transition-fast);
     position: relative;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .booking-chip:hover {
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    filter: brightness(1.1);
 }
 
 /* Manager avatar in team cards */
@@ -1493,9 +1666,10 @@ form {
 }
 
 [data-theme="light"] .booking-chip {
-    background: var(--bg-tertiary);
-    color: var(--text-primary);
-    border: 1px solid var(--border-color);
+    /* Keep team color background in light mode too */
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
 }
 
 [data-theme="light"] .day-number {
@@ -1559,19 +1733,18 @@ form {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
     border-radius: var(--radius-sm);
-    color: var(--text-muted);
+    color: white;
     cursor: pointer;
     transition: all var(--transition-fast);
     padding: 0;
 }
 
 .sync-btn:hover {
-    background: var(--bg-card-hover);
-    color: var(--accent-primary);
-    border-color: var(--accent-primary);
+    background: rgba(255, 255, 255, 0.35);
+    color: white;
 }
 
 .sync-btn svg {
@@ -1580,18 +1753,18 @@ form {
 }
 
 .sync-btn.google:hover {
-    color: #4285f4;
-    border-color: #4285f4;
+    background: rgba(66, 133, 244, 0.9);
+    border-color: rgba(255, 255, 255, 0.4);
 }
 
 .sync-btn.outlook:hover {
-    color: #0078d4;
-    border-color: #0078d4;
+    background: rgba(0, 120, 212, 0.9);
+    border-color: rgba(255, 255, 255, 0.4);
 }
 
 .sync-btn.ics:hover {
-    color: var(--success);
-    border-color: var(--success);
+    background: rgba(34, 197, 94, 0.9);
+    border-color: rgba(255, 255, 255, 0.4);
 }
 
 /* ============================================

@@ -1,23 +1,137 @@
 {
   "locations": [
-    { "id": "jhb", "name": "JHB Office", "capacity": 21 },
-    { "id": "cpt", "name": "Cape Town Office", "capacity": 15 },
-    { "id": "dbn", "name": "Durban Office", "capacity": 10 }
+    {
+      "id": "jhb",
+      "name": "JHB Office",
+      "capacity": 21,
+      "address": "22 Cradock Ave, Rosebank, Sandton, 2196"
+    },
+    {
+      "id": "cpt",
+      "name": "Cape Town Office",
+      "capacity": 15,
+      "address": "34 Bree St, Cape Town City Centre, Cape Town, 8001"
+    }
   ],
-  "teams": [],
-  "bookings": [],
+  "teams": [
+    {
+      "id": "hello",
+      "name": "Migrations",
+      "manager": "Koos Kombuis",
+      "managerImage": "https://cdn.24.co.za/files/Cms/General/d/11988/10165fab227f49959d704211cc2dbd28.jpg",
+      "color": "#3b82f6",
+      "memberCount": 6,
+      "locationId": "jhb"
+    },
+    {
+      "id": "absa-cib",
+      "name": "ABSA CIB",
+      "manager": "Hugo Lindeque",
+      "managerImage": "https://cdn.prod.website-files.com/66cd7e92bafc89dd93fa816b/671241eb3b22dfce4de76662_Hugo%20Lindeque.avif",
+      "color": "#ff7e79",
+      "memberCount": 5,
+      "locationId": "jhb"
+    },
+    {
+      "id": "c-suite",
+      "name": "C-Suite",
+      "manager": "Nemanja Stabic",
+      "managerImage": "https://cdn.prod.website-files.com/66cd7e92bafc89dd93fa816b/66e0560d392f89eb4d3bff0b_Nem.avif",
+      "color": "#ff6a00",
+      "memberCount": 4,
+      "locationId": "jhb"
+    }
+  ],
+  "bookings": [
+    {
+      "id": "1765545452373",
+      "date": "2025-12-10",
+      "teamId": "hello",
+      "teamName": "Hello",
+      "peopleCount": 1,
+      "locationId": "jhb",
+      "notes": "",
+      "createdAt": "2025-12-12T13:17:32.373Z"
+    },
+    {
+      "id": "1765545564379",
+      "date": "2025-12-11",
+      "teamId": "hello",
+      "teamName": "Migration",
+      "peopleCount": 5,
+      "locationId": "jhb",
+      "notes": "",
+      "createdAt": "2025-12-12T13:19:24.379Z"
+    },
+    {
+      "id": "1765546059335",
+      "date": "2025-12-18",
+      "teamId": "absa-cib",
+      "teamName": "ABSA CIB",
+      "peopleCount": 1,
+      "locationId": "jhb",
+      "notes": "",
+      "createdAt": "2025-12-12T13:27:39.335Z"
+    },
+    {
+      "id": "1765546151676",
+      "date": "2025-12-11",
+      "teamId": "c-suite",
+      "teamName": "C-Suite",
+      "peopleCount": 4,
+      "locationId": "jhb",
+      "notes": "Testing",
+      "createdAt": "2025-12-12T13:29:11.676Z"
+    }
+  ],
   "publicHolidays": [
-    { "date": "2026-01-01", "name": "New Year's Day" },
-    { "date": "2026-03-21", "name": "Human Rights Day" },
-    { "date": "2026-04-03", "name": "Good Friday" },
-    { "date": "2026-04-06", "name": "Family Day" },
-    { "date": "2026-04-27", "name": "Freedom Day" },
-    { "date": "2026-05-01", "name": "Workers' Day" },
-    { "date": "2026-06-16", "name": "Youth Day" },
-    { "date": "2026-08-10", "name": "National Women's Day" },
-    { "date": "2026-09-24", "name": "Heritage Day" },
-    { "date": "2026-12-16", "name": "Day of Reconciliation" },
-    { "date": "2026-12-25", "name": "Christmas Day" },
-    { "date": "2026-12-26", "name": "Day of Goodwill" }
+    {
+      "date": "2026-01-01",
+      "name": "New Year's Day"
+    },
+    {
+      "date": "2026-03-21",
+      "name": "Human Rights Day"
+    },
+    {
+      "date": "2026-04-03",
+      "name": "Good Friday"
+    },
+    {
+      "date": "2026-04-06",
+      "name": "Family Day"
+    },
+    {
+      "date": "2026-04-27",
+      "name": "Freedom Day"
+    },
+    {
+      "date": "2026-05-01",
+      "name": "Workers' Day"
+    },
+    {
+      "date": "2026-06-16",
+      "name": "Youth Day"
+    },
+    {
+      "date": "2026-08-10",
+      "name": "National Women's Day"
+    },
+    {
+      "date": "2026-09-24",
+      "name": "Heritage Day"
+    },
+    {
+      "date": "2026-12-16",
+      "name": "Day of Reconciliation"
+    },
+    {
+      "date": "2026-12-25",
+      "name": "Christmas Day"
+    },
+    {
+      "date": "2026-12-26",
+      "name": "Day of Goodwill"
+    }
   ]
 }

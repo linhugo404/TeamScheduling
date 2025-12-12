@@ -366,7 +366,7 @@ function renderCalendar() {
         
         // Get bookings for this day
         const dayBookings = monthBookings.filter(b => b.date === dateStr);
-        const totalPeople = dayBookings.reduce((sum, b) => sum + b.peopleCount, 0);
+        const totalPeople = dayBookings.reduce((sum, b) => sum + getBookingPeopleCount(b), 0);
         
         let classes = ['calendar-day'];
         if (isWeekend) classes.push('weekend');
@@ -396,18 +396,21 @@ function renderCalendar() {
                 const team = state.teams.find(t => t.id === booking.teamId);
                 const color = team ? team.color : '#6B7280';
                 const teamId = team ? team.id : '';
+                // Use current team name and member count, fallback to booking data
+                const displayName = team ? team.name : booking.teamName;
+                const displayCount = team ? team.memberCount : booking.peopleCount;
                 dayContent += `
                     <div class="booking-chip" 
                          draggable="true"
                          data-booking-id="${booking.id}"
                          data-team-id="${teamId}"
+                         style="background: ${color};"
                          ondragstart="handleDragStart(event, '${booking.id}')"
                          ondragend="handleDragEnd(event)"
                          onmouseenter="showTeamTooltip(event, '${teamId}')"
                          onmouseleave="hideTeamTooltip()">
-                        <span class="booking-chip-color" style="background: ${color}"></span>
-                        <span>${booking.teamName}</span>
-                        <span style="opacity: 0.7">(${booking.peopleCount})</span>
+                        <span>${displayName}</span>
+                        <span style="opacity: 0.8">(${displayCount})</span>
                     </div>
                 `;
             });
@@ -499,7 +502,7 @@ function handleTeamSelect() {
             const dayBookings = state.bookings.filter(
                 b => b.date === state.selectedDate && b.locationId === state.currentLocation
             );
-            const used = dayBookings.reduce((sum, b) => sum + b.peopleCount, 0);
+            const used = dayBookings.reduce((sum, b) => sum + getBookingPeopleCount(b), 0);
             const available = capacity - used;
             
             if (memberCount > available) {
@@ -523,7 +526,7 @@ function updateAvailableSpotsHint(dateStr) {
     const dayBookings = state.bookings.filter(
         b => b.date === dateStr && b.locationId === state.currentLocation
     );
-    const used = dayBookings.reduce((sum, b) => sum + b.peopleCount, 0);
+    const used = dayBookings.reduce((sum, b) => sum + getBookingPeopleCount(b), 0);
     const available = capacity - used;
     
     document.getElementById('availableSpots').textContent = `Available: ${available} of ${capacity}`;
@@ -546,13 +549,15 @@ function renderDayBookings(dateStr) {
         const team = state.teams.find(t => t.id === booking.teamId);
         const color = team ? team.color : '#6B7280';
         const location = state.locations.find(l => l.id === booking.locationId);
+        // Use current team name and member count, fallback to booking data
+        const displayName = team ? team.name : booking.teamName;
+        const displayCount = team ? team.memberCount : booking.peopleCount;
         
         return `
-            <div class="booking-item">
+            <div class="booking-item" style="background: ${color}; border-left: none;">
                 <div class="booking-info">
-                    <span class="booking-team-color" style="background: ${color}"></span>
-                    <span class="booking-team-name">${booking.teamName}</span>
-                    <span class="booking-people">${booking.peopleCount} people</span>
+                    <span class="booking-team-name" style="color: white;">${displayName}</span>
+                    <span class="booking-people" style="color: rgba(255,255,255,0.8);">${displayCount} people</span>
                 </div>
                 <div class="calendar-sync-buttons">
                     <button class="sync-btn google" onclick="addToGoogleCalendar('${booking.id}')" title="Add to Google Calendar">
@@ -710,7 +715,7 @@ function updateCapacityDisplay() {
     const todayBookings = state.bookings.filter(
         b => b.date === today && b.locationId === state.currentLocation
     );
-    const used = todayBookings.reduce((sum, b) => sum + b.peopleCount, 0);
+    const used = todayBookings.reduce((sum, b) => sum + getBookingPeopleCount(b), 0);
     const percentage = Math.min((used / capacity) * 100, 100);
     
     elements.capacityLabel.textContent = `${used}/${capacity}`;
@@ -801,32 +806,31 @@ function renderTeamsList() {
         locationTeams.forEach(team => {
             const avatarContent = getAvatarHTML(team.manager, team.managerImage, team.color);
             html += `
-                <div class="team-card" style="border-left: 4px solid ${team.color};">
-                    <div class="team-card-header">
-                        <div class="team-card-info">
-                            <div class="team-card-avatar" style="background: ${team.managerImage ? 'transparent' : `linear-gradient(135deg, ${team.color}, ${adjustColor(team.color, -30)})`}">
-                                ${avatarContent}
-                            </div>
-                            <div class="team-card-details">
-                                <div class="team-name">${team.name}</div>
-                                <div class="team-manager-name">${team.manager || 'No manager assigned'}</div>
-                                <div class="team-meta">
-                                    <span class="team-meta-item">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                                            <circle cx="9" cy="7" r="4"></circle>
-                                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                                        </svg>
-                                        ${team.memberCount || 0} members
-                                    </span>
-                                </div>
-                            </div>
+                <div class="team-card">
+                    <div class="team-card-color-bar" style="background: ${team.color};"></div>
+                    <div class="team-card-avatar-wrapper">
+                        <div class="team-card-avatar" style="background: ${team.managerImage ? 'transparent' : `linear-gradient(135deg, ${team.color}, ${adjustColor(team.color, -30)})`}; border-color: ${team.color};">
+                            ${avatarContent}
                         </div>
-                        <div class="team-card-actions">
-                            <button class="btn btn-small btn-secondary" onclick="editTeam('${team.id}')">Edit</button>
-                            <button class="btn btn-small btn-danger" onclick="deleteTeam('${team.id}')">Delete</button>
+                    </div>
+                    <div class="team-card-body">
+                        <div class="team-name">${team.name}</div>
+                        <div class="team-manager-name">${team.manager || 'No manager assigned'}</div>
+                        <div class="team-meta">
+                            <span class="team-meta-item">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="9" cy="7" r="4"></circle>
+                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                </svg>
+                                ${team.memberCount || 0} member${team.memberCount !== 1 ? 's' : ''}
+                            </span>
                         </div>
+                    </div>
+                    <div class="team-card-actions">
+                        <button class="btn btn-small btn-secondary" onclick="editTeam('${team.id}')">Edit</button>
+                        <button class="btn btn-small btn-danger" onclick="deleteTeam('${team.id}')">Delete</button>
                     </div>
                 </div>
             `;
@@ -860,20 +864,166 @@ function getInitials(name) {
 
 function renderLocationsList() {
     const container = document.getElementById('locationsList');
-    container.innerHTML = state.locations.map(loc => `
-        <div class="location-card">
-            <div class="location-card-header">
-                <div class="location-card-info">
+    container.innerHTML = state.locations.map(loc => {
+        const hasAddress = loc.address && loc.address.trim();
+        const mapsLink = hasAddress
+            ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc.address)}`
+            : '#';
+        
+        return `
+            <div class="location-card">
+                ${hasAddress ? `
+                    <div class="location-map" id="map-${loc.id}" data-address="${encodeURIComponent(loc.address)}">
+                        <div class="map-loading">
+                            <svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+                            </svg>
+                            Loading map...
+                        </div>
+                        <a href="${mapsLink}" target="_blank" class="map-overlay-link" title="Open in Google Maps">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                                <polyline points="15 3 21 3 21 9"></polyline>
+                                <line x1="10" y1="14" x2="21" y2="3"></line>
+                            </svg>
+                        </a>
+                    </div>
+                ` : `
+                    <div class="location-map location-map-empty">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                            <circle cx="12" cy="10" r="3"></circle>
+                        </svg>
+                        <span>No address set</span>
+                    </div>
+                `}
+                <div class="location-card-body">
                     <div class="location-name">${loc.name}</div>
-                    <p class="location-capacity-info">Max Capacity: ${loc.capacity} people per day</p>
+                    ${hasAddress ? `<div class="location-address">${loc.address}</div>` : ''}
+                    <div class="location-meta">
+                        <span class="location-meta-item">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            </svg>
+                            ${loc.capacity} capacity
+                        </span>
+                    </div>
                 </div>
                 <div class="location-card-actions">
                     <button class="btn btn-small btn-secondary" onclick="editLocation('${loc.id}')">Edit</button>
                     <button class="btn btn-small btn-danger" onclick="deleteLocation('${loc.id}')">Delete</button>
                 </div>
             </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
+    
+    // Initialize maps after rendering
+    initializeLocationMaps();
+}
+
+// Map instances storage
+const locationMaps = new Map();
+
+async function initializeLocationMaps() {
+    // Clean up existing maps
+    locationMaps.forEach(map => map.remove());
+    locationMaps.clear();
+    
+    const mapContainers = document.querySelectorAll('.location-map[data-address]');
+    
+    for (const container of mapContainers) {
+        const address = decodeURIComponent(container.dataset.address);
+        const mapId = container.id;
+        
+        try {
+            // Geocode the address using Nominatim (free)
+            const response = await fetch(
+                `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`
+            );
+            const data = await response.json();
+            
+            if (data && data.length > 0) {
+                const lat = parseFloat(data[0].lat);
+                const lon = parseFloat(data[0].lon);
+                
+                // Create a dedicated map div inside the container
+                container.innerHTML = `
+                    <div id="${mapId}-leaflet" style="width: 100%; height: 100%;"></div>
+                    <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}" target="_blank" class="map-overlay-link" title="Open in Google Maps">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                            <polyline points="15 3 21 3 21 9"></polyline>
+                            <line x1="10" y1="14" x2="21" y2="3"></line>
+                        </svg>
+                    </a>
+                `;
+                
+                // Small delay to ensure DOM is ready
+                await new Promise(resolve => setTimeout(resolve, 50));
+                
+                // Create Leaflet map with dark tiles
+                const mapElement = document.getElementById(`${mapId}-leaflet`);
+                if (!mapElement) continue;
+                
+                const map = L.map(mapElement, {
+                    zoomControl: false,
+                    attributionControl: false,
+                    dragging: false,
+                    scrollWheelZoom: false,
+                    doubleClickZoom: false,
+                    touchZoom: false
+                }).setView([lat, lon], 16);
+                
+                // Dark tile layer from CartoDB
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                    maxZoom: 19,
+                    attribution: ''
+                }).addTo(map);
+                
+                // Custom orange marker using L.icon with SVG data URL
+                const markerSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 32" width="32" height="42"><path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 20 12 20s12-11 12-20c0-6.6-5.4-12-12-12z" fill="%23d95c02"/><circle cx="12" cy="12" r="5" fill="white"/></svg>`;
+                const iconUrl = `data:image/svg+xml,${encodeURIComponent(markerSvg)}`;
+                
+                const orangeIcon = L.icon({
+                    iconUrl: iconUrl,
+                    iconSize: [32, 42],
+                    iconAnchor: [16, 42],
+                    popupAnchor: [0, -42]
+                });
+                
+                L.marker([lat, lon], { icon: orangeIcon }).addTo(map);
+                
+                // Force a resize after a short delay
+                setTimeout(() => map.invalidateSize(), 100);
+                
+                locationMaps.set(mapId, map);
+            } else {
+                container.innerHTML = `
+                    <div class="location-map-empty">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                            <circle cx="12" cy="10" r="3"></circle>
+                        </svg>
+                        <span>Address not found</span>
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Failed to load map for:', address, error);
+            container.innerHTML = `
+                <div class="location-map-empty">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                        <circle cx="12" cy="10" r="3"></circle>
+                    </svg>
+                    <span>Map unavailable</span>
+                </div>
+            `;
+        }
+    }
 }
 
 async function handleTeamSubmit(e) {
@@ -916,6 +1066,10 @@ async function handleTeamSubmit(e) {
         
         await loadData();
         renderTeamsList();
+        renderTeamsLegend();
+        renderTeamSelect();
+        renderCalendar();
+        updateCapacityDisplay();
         
     } catch (error) {
         showToast(error.message || 'Failed to save team', 'error');
@@ -946,6 +1100,7 @@ async function handleLocationSubmit(e) {
     
     const editLocationId = document.getElementById('editLocationId').value;
     const name = document.getElementById('locationName').value;
+    const address = document.getElementById('locationAddress').value;
     const capacity = parseInt(document.getElementById('locationCapacity').value);
     
     try {
@@ -956,14 +1111,14 @@ async function handleLocationSubmit(e) {
             response = await fetch(`/api/locations/${editLocationId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, capacity })
+                body: JSON.stringify({ name, address, capacity })
             });
         } else {
             // Create new location
             response = await fetch('/api/locations', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, capacity })
+                body: JSON.stringify({ name, address, capacity })
             });
         }
         
@@ -992,6 +1147,7 @@ function editLocation(id) {
     
     document.getElementById('editLocationId').value = location.id;
     document.getElementById('locationName').value = location.name;
+    document.getElementById('locationAddress').value = location.address || '';
     document.getElementById('locationCapacity').value = location.capacity;
     document.getElementById('locationFormSubmitBtn').textContent = 'Save Changes';
     document.getElementById('locationModalTitle').textContent = 'Edit Location';
@@ -1008,6 +1164,10 @@ async function deleteTeam(id) {
         
         await loadData();
         renderTeamsList();
+        renderTeamsLegend();
+        renderTeamSelect();
+        renderCalendar();
+        updateCapacityDisplay();
         
     } catch (error) {
         showToast('Failed to delete team', 'error');
@@ -1123,6 +1283,7 @@ function closeLocationModal() {
     elements.locationModal.classList.remove('active');
     elements.locationForm.reset();
     document.getElementById('editLocationId').value = '';
+    document.getElementById('locationAddress').value = '';
     document.getElementById('locationFormSubmitBtn').textContent = 'Add Location';
     document.getElementById('locationModalTitle').textContent = 'Add Location';
 }
@@ -1277,6 +1438,12 @@ function switchView(viewName) {
 // ============================================
 // Utilities
 // ============================================
+
+// Get effective people count for a booking (uses current team memberCount if available)
+function getBookingPeopleCount(booking) {
+    const team = state.teams.find(t => t.id === booking.teamId);
+    return team ? team.memberCount : booking.peopleCount;
+}
 
 function formatDateStr(date) {
     const year = date.getFullYear();

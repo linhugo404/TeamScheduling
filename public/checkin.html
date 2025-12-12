@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Desk Check-In</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #0a0c10 0%, #161b22 100%);
+            color: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+        
+        .container {
+            background: #1c2128;
+            border: 1px solid rgba(168, 181, 196, 0.1);
+            border-radius: 16px;
+            padding: 2rem;
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+        
+        .logo {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #d95c02, #b84d00);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+            box-shadow: 0 4px 20px rgba(217, 92, 2, 0.25);
+        }
+        
+        .logo svg {
+            width: 32px;
+            height: 32px;
+            color: white;
+        }
+        
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .desk-name {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #d95c02;
+            margin: 1rem 0;
+        }
+        
+        .location {
+            color: #a8b5c4;
+            margin-bottom: 1.5rem;
+        }
+        
+        .booking-card {
+            background: #0f1318;
+            border-radius: 12px;
+            padding: 1rem;
+            margin: 0.75rem 0;
+            text-align: left;
+            border: 1px solid rgba(168, 181, 196, 0.1);
+        }
+        
+        .booking-card.active {
+            border-color: #d95c02;
+            box-shadow: 0 0 20px rgba(217, 92, 2, 0.15);
+        }
+        
+        .booking-time {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1rem;
+            color: #d95c02;
+            margin-bottom: 0.5rem;
+        }
+        
+        .booking-person {
+            font-weight: 500;
+        }
+        
+        .booking-status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-top: 0.5rem;
+        }
+        
+        .status-pending {
+            background: rgba(245, 158, 11, 0.15);
+            color: #f5a623;
+        }
+        
+        .status-checked-in {
+            background: rgba(34, 197, 94, 0.15);
+            color: #22c55e;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            background: linear-gradient(135deg, #d95c02, #b84d00);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-family: inherit;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 0.5rem;
+            width: 100%;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 24px rgba(217, 92, 2, 0.4);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .message {
+            padding: 1rem;
+            border-radius: 10px;
+            margin: 1rem 0;
+        }
+        
+        .message.success {
+            background: rgba(34, 197, 94, 0.15);
+            color: #22c55e;
+        }
+        
+        .message.error {
+            background: rgba(239, 68, 68, 0.15);
+            color: #e53935;
+        }
+        
+        .no-bookings {
+            color: #6b7a8c;
+            padding: 2rem;
+        }
+        
+        .loading {
+            color: #6b7a8c;
+            padding: 2rem;
+        }
+        
+        .back-link {
+            margin-top: 1.5rem;
+            color: #6b7a8c;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        
+        .back-link:hover {
+            color: #d95c02;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                <path d="M16 7V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v3"></path>
+            </svg>
+        </div>
+        
+        <div id="content">
+            <div class="loading">Loading desk information...</div>
+        </div>
+        
+        <a href="/" class="back-link">← Back to booking system</a>
+    </div>
+    
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const qrCode = urlParams.get('code');
+        
+        async function loadDeskInfo() {
+            const content = document.getElementById('content');
+            
+            if (!qrCode) {
+                content.innerHTML = '<div class="message error">Invalid QR code</div>';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/checkin/${qrCode}`);
+                
+                if (!response.ok) {
+                    throw new Error('Desk not found');
+                }
+                
+                const data = await response.json();
+                renderDeskInfo(data);
+                
+            } catch (error) {
+                content.innerHTML = `<div class="message error">${error.message || 'Failed to load desk information'}</div>`;
+            }
+        }
+        
+        function renderDeskInfo(data) {
+            const { desk, location, todayBookings } = data;
+            const content = document.getElementById('content');
+            
+            const now = new Date();
+            const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+            
+            let html = `
+                <h1>Desk Check-In</h1>
+                <div class="desk-name">${desk.name}</div>
+                <div class="location">
+                    ${location?.name || 'Unknown Location'}
+                    ${desk.floor ? ` • Floor ${desk.floor}` : ''}
+                    ${desk.zone ? ` • ${desk.zone}` : ''}
+                </div>
+            `;
+            
+            if (todayBookings.length === 0) {
+                html += '<div class="no-bookings">No bookings for today</div>';
+            } else {
+                html += '<h3 style="margin: 1rem 0 0.5rem; font-size: 0.9rem; color: #a8b5c4;">Today\'s Bookings</h3>';
+                
+                todayBookings.forEach(booking => {
+                    const isActive = currentTime >= booking.startTime && currentTime < booking.endTime;
+                    const canCheckIn = isActive && !booking.checkedIn;
+                    
+                    html += `
+                        <div class="booking-card ${isActive ? 'active' : ''}">
+                            <div class="booking-time">${booking.startTime} - ${booking.endTime}</div>
+                            <div class="booking-person">${booking.employeeName}</div>
+                            ${booking.checkedIn 
+                                ? '<span class="booking-status status-checked-in">✓ Checked In</span>'
+                                : '<span class="booking-status status-pending">Pending</span>'
+                            }
+                            ${canCheckIn ? `
+                                <button class="btn" onclick="checkIn('${booking.id}')">
+                                    Check In Now
+                                </button>
+                            ` : ''}
+                        </div>
+                    `;
+                });
+            }
+            
+            content.innerHTML = html;
+        }
+        
+        async function checkIn(bookingId) {
+            try {
+                const response = await fetch(`/api/desk-bookings/${bookingId}/checkin`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ qrCode })
+                });
+                
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.error || 'Check-in failed');
+                }
+                
+                // Reload to show updated status
+                loadDeskInfo();
+                
+            } catch (error) {
+                alert(error.message || 'Check-in failed');
+            }
+        }
+        
+        // Load on page load
+        loadDeskInfo();
+    </script>
+</body>
+</html>
+

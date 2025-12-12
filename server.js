@@ -434,6 +434,14 @@ app.put('/api/locations/:id', async (req, res) => {
             updates.capacity = parseInt(updates.capacity);
         }
         
+        // Handle floor plan dimensions
+        if (updates.floorPlanWidth) {
+            updates.floorPlanWidth = parseInt(updates.floorPlanWidth);
+        }
+        if (updates.floorPlanHeight) {
+            updates.floorPlanHeight = parseInt(updates.floorPlanHeight);
+        }
+        
         data.locations[locationIndex] = { ...data.locations[locationIndex], ...updates };
         await writeData(data);
         
@@ -580,6 +588,379 @@ app.delete('/api/teams/:id', async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'Failed to delete team' });
+    }
+});
+
+// ============================================
+// Desk Management
+// ============================================
+
+// Get all desks for a location
+app.get('/api/desks', async (req, res) => {
+    try {
+        const { locationId } = req.query;
+        const data = await readData();
+        
+        if (!data.desks) data.desks = [];
+        
+        let desks = data.desks;
+        if (locationId) {
+            desks = desks.filter(d => d.locationId === locationId);
+        }
+        
+        res.json(desks);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch desks' });
+    }
+});
+
+// Create a new desk
+app.post('/api/desks', async (req, res) => {
+    try {
+        const { name, locationId, floor, zone, x, y, width, height, deskType, assignedTeamId, chairPositions } = req.body;
+        
+        if (!name || !locationId) {
+            return res.status(400).json({ error: 'Name and location are required' });
+        }
+        
+        const data = await readData();
+        if (!data.desks) data.desks = [];
+        
+        const newDesk = {
+            id: Date.now().toString(),
+            name,
+            locationId,
+            floor: floor || '1',
+            zone: zone || '',
+            x: x || 0,
+            y: y || 0,
+            width: width || 60,
+            height: height || 40,
+            deskType: deskType || 'hotseat', // hotseat, team_seat, unavailable
+            assignedTeamId: assignedTeamId || null,
+            chairPositions: chairPositions || ['bottom'], // top, bottom, left, right
+            qrCode: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            createdAt: new Date().toISOString()
+        };
+        
+        data.desks.push(newDesk);
+        await writeData(data);
+        
+        res.status(201).json(newDesk);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to create desk' });
+    }
+});
+
+// Floor plan elements (walls, rooms, labels)
+app.get('/api/floor-elements', async (req, res) => {
+    try {
+        const { locationId, floor } = req.query;
+        const data = await readData();
+        if (!data.floorElements) data.floorElements = [];
+        
+        let elements = data.floorElements;
+        if (locationId) elements = elements.filter(e => e.locationId === locationId);
+        if (floor) elements = elements.filter(e => e.floor === floor);
+        
+        res.json(elements);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to get floor elements' });
+    }
+});
+
+app.post('/api/floor-elements', async (req, res) => {
+    try {
+        const { type, locationId, floor, x, y, width, height, points, label, color } = req.body;
+        
+        if (!type || !locationId) {
+            return res.status(400).json({ error: 'Type and location are required' });
+        }
+        
+        const data = await readData();
+        if (!data.floorElements) data.floorElements = [];
+        
+        const newElement = {
+            id: Date.now().toString(),
+            type, // wall, room, label
+            locationId,
+            floor: floor || '1',
+            x: x || 0,
+            y: y || 0,
+            width: width || 100,
+            height: height || 100,
+            points: points || [], // For walls/lines
+            label: label || '',
+            color: color || null,
+            createdAt: new Date().toISOString()
+        };
+        
+        data.floorElements.push(newElement);
+        await writeData(data);
+        
+        res.status(201).json(newElement);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to create floor element' });
+    }
+});
+
+app.put('/api/floor-elements/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const updates = req.body;
+        
+        const data = await readData();
+        if (!data.floorElements) data.floorElements = [];
+        
+        const elementIndex = data.floorElements.findIndex(e => e.id === id);
+        if (elementIndex === -1) {
+            return res.status(404).json({ error: 'Element not found' });
+        }
+        
+        data.floorElements[elementIndex] = { ...data.floorElements[elementIndex], ...updates };
+        await writeData(data);
+        
+        res.json(data.floorElements[elementIndex]);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to update floor element' });
+    }
+});
+
+app.delete('/api/floor-elements/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const data = await readData();
+        if (!data.floorElements) data.floorElements = [];
+        
+        data.floorElements = data.floorElements.filter(e => e.id !== id);
+        await writeData(data);
+        
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to delete floor element' });
+    }
+});
+
+// Update a desk
+app.put('/api/desks/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const updates = req.body;
+        
+        const data = await readData();
+        if (!data.desks) data.desks = [];
+        
+        const deskIndex = data.desks.findIndex(d => d.id === id);
+        if (deskIndex === -1) {
+            return res.status(404).json({ error: 'Desk not found' });
+        }
+        
+        data.desks[deskIndex] = { ...data.desks[deskIndex], ...updates };
+        await writeData(data);
+        
+        res.json(data.desks[deskIndex]);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to update desk' });
+    }
+});
+
+// Delete a desk
+app.delete('/api/desks/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const data = await readData();
+        
+        if (!data.desks) data.desks = [];
+        data.desks = data.desks.filter(d => d.id !== id);
+        
+        // Also delete all bookings for this desk
+        if (!data.deskBookings) data.deskBookings = [];
+        data.deskBookings = data.deskBookings.filter(b => b.deskId !== id);
+        
+        await writeData(data);
+        
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to delete desk' });
+    }
+});
+
+// ============================================
+// Desk Bookings
+// ============================================
+
+// Get desk bookings for a date/location
+app.get('/api/desk-bookings', async (req, res) => {
+    try {
+        const { date, locationId, deskId } = req.query;
+        const data = await readData();
+        
+        if (!data.deskBookings) data.deskBookings = [];
+        
+        let bookings = data.deskBookings;
+        
+        if (date) {
+            bookings = bookings.filter(b => b.date === date);
+        }
+        if (locationId) {
+            bookings = bookings.filter(b => b.locationId === locationId);
+        }
+        if (deskId) {
+            bookings = bookings.filter(b => b.deskId === deskId);
+        }
+        
+        res.json(bookings);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch desk bookings' });
+    }
+});
+
+// Create a desk booking (30-min slot)
+app.post('/api/desk-bookings', async (req, res) => {
+    try {
+        const { deskId, date, startTime, endTime, employeeName, employeeEmail, teamId } = req.body;
+        
+        if (!deskId || !date || !startTime || !endTime || !employeeName) {
+            return res.status(400).json({ error: 'Missing required fields' });
+        }
+        
+        const data = await readData();
+        if (!data.deskBookings) data.deskBookings = [];
+        if (!data.desks) data.desks = [];
+        
+        const desk = data.desks.find(d => d.id === deskId);
+        if (!desk) {
+            return res.status(400).json({ error: 'Desk not found' });
+        }
+        
+        // Check for conflicts
+        const conflict = data.deskBookings.find(b => 
+            b.deskId === deskId && 
+            b.date === date &&
+            ((startTime >= b.startTime && startTime < b.endTime) ||
+             (endTime > b.startTime && endTime <= b.endTime) ||
+             (startTime <= b.startTime && endTime >= b.endTime))
+        );
+        
+        if (conflict) {
+            return res.status(400).json({ error: 'Time slot already booked' });
+        }
+        
+        const newBooking = {
+            id: Date.now().toString(),
+            deskId,
+            deskName: desk.name,
+            locationId: desk.locationId,
+            date,
+            startTime,
+            endTime,
+            employeeName,
+            employeeEmail: employeeEmail || '',
+            teamId: teamId || null,
+            checkedIn: false,
+            checkedInAt: null,
+            createdAt: new Date().toISOString()
+        };
+        
+        data.deskBookings.push(newBooking);
+        await writeData(data);
+        
+        res.status(201).json(newBooking);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to create desk booking' });
+    }
+});
+
+// Cancel a desk booking
+app.delete('/api/desk-bookings/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const data = await readData();
+        
+        if (!data.deskBookings) data.deskBookings = [];
+        data.deskBookings = data.deskBookings.filter(b => b.id !== id);
+        
+        await writeData(data);
+        
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to cancel desk booking' });
+    }
+});
+
+// Check in to a desk booking via QR code
+app.post('/api/desk-bookings/:id/checkin', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { qrCode } = req.body;
+        
+        const data = await readData();
+        if (!data.deskBookings) data.deskBookings = [];
+        if (!data.desks) data.desks = [];
+        
+        const booking = data.deskBookings.find(b => b.id === id);
+        if (!booking) {
+            return res.status(404).json({ error: 'Booking not found' });
+        }
+        
+        const desk = data.desks.find(d => d.id === booking.deskId);
+        if (!desk) {
+            return res.status(404).json({ error: 'Desk not found' });
+        }
+        
+        // Verify QR code matches the desk
+        if (qrCode && desk.qrCode !== qrCode) {
+            return res.status(400).json({ error: 'Invalid QR code for this desk' });
+        }
+        
+        // Check if booking is for today
+        const today = new Date().toISOString().split('T')[0];
+        if (booking.date !== today) {
+            return res.status(400).json({ error: 'Can only check in on the booking date' });
+        }
+        
+        // Mark as checked in
+        booking.checkedIn = true;
+        booking.checkedInAt = new Date().toISOString();
+        
+        await writeData(data);
+        
+        res.json({ success: true, booking });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to check in' });
+    }
+});
+
+// Get check-in page data (for QR code scan)
+app.get('/api/checkin/:qrCode', async (req, res) => {
+    try {
+        const { qrCode } = req.params;
+        const data = await readData();
+        
+        if (!data.desks) data.desks = [];
+        if (!data.deskBookings) data.deskBookings = [];
+        
+        const desk = data.desks.find(d => d.qrCode === qrCode);
+        if (!desk) {
+            return res.status(404).json({ error: 'Desk not found' });
+        }
+        
+        const location = data.locations.find(l => l.id === desk.locationId);
+        
+        // Get today's bookings for this desk
+        const today = new Date().toISOString().split('T')[0];
+        const todayBookings = data.deskBookings.filter(
+            b => b.deskId === desk.id && b.date === today
+        );
+        
+        res.json({
+            desk,
+            location,
+            todayBookings
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to get check-in data' });
     }
 });
 

@@ -266,6 +266,11 @@ function setupEventListeners() {
         renderTeamsLegend();
         renderTeamSelect();
         joinCurrentRoom();
+        
+        // Reload desks if desks view is active
+        if (document.getElementById('desksView').classList.contains('active')) {
+            loadDesks();
+        }
     });
     
     // Booking form
@@ -1433,6 +1438,11 @@ function switchView(viewName) {
     document.querySelectorAll('.view').forEach(view => {
         view.classList.toggle('active', view.id === `${viewName}View`);
     });
+    
+    // Initialize desks view when selected
+    if (viewName === 'desks') {
+        initDesksView();
+    }
 }
 
 // ============================================
@@ -1607,8 +1617,1490 @@ function downloadICS(bookingId) {
 }
 
 // ============================================
+// Desk Booking System
+// ============================================
+
+// Desk state
+let deskState = {
+    desks: [],
+    deskBookings: [],
+    floorElements: [],
+    selectedDate: formatDateStr(new Date()),
+    selectedSlots: [],
+    editMode: false,
+    previewTime: '08:00',
+    currentFloor: '1',
+    selectedElement: null,
+    activeTool: null,
+    draggedDesk: null
+};
+
+async function loadDesks() {
+    try {
+        // Always use the main sidebar location
+        const locationId = state.currentLocation;
+        const floor = deskState.currentFloor;
+        
+        const response = await fetch(`/api/desks?locationId=${locationId}`);
+        const allDesks = await response.json();
+        deskState.desks = allDesks.filter(d => (d.floor || '1') === floor);
+        
+        const date = deskState.selectedDate;
+        const bookingsResponse = await fetch(`/api/desk-bookings?locationId=${locationId}&date=${date}`);
+        deskState.deskBookings = await bookingsResponse.json();
+        
+        // Load floor elements
+        const elementsResponse = await fetch(`/api/floor-elements?locationId=${locationId}&floor=${floor}`);
+        deskState.floorElements = await elementsResponse.json();
+        
+        renderFloorMap();
+    } catch (error) {
+        console.error('Failed to load desks:', error);
+    }
+}
+
+let desksViewInitialized = false;
+
+function initDesksView() {
+    const dateSelect = document.getElementById('deskDateSelect');
+    const deskForm = document.getElementById('deskForm');
+    const deskBookingForm = document.getElementById('deskBookingForm');
+    const toggleEditBtn = document.getElementById('toggleEditMode');
+    const timeSlider = document.getElementById('timePreviewSlider');
+    const floorSelect = document.getElementById('floorSelect');
+    const deskTypeSelect = document.getElementById('deskType');
+    
+    // Set default date to today
+    dateSelect.value = deskState.selectedDate;
+    
+    // Only add event listeners once
+    if (!desksViewInitialized) {
+        dateSelect.addEventListener('change', (e) => {
+            deskState.selectedDate = e.target.value;
+            loadDesks();
+        });
+        
+        floorSelect.addEventListener('change', (e) => {
+            deskState.currentFloor = e.target.value;
+            loadDesks();
+        });
+        
+        deskForm.addEventListener('submit', handleDeskSubmit);
+        deskBookingForm.addEventListener('submit', handleDeskBookingSubmit);
+        
+        toggleEditBtn.addEventListener('click', toggleEditMode);
+        
+        timeSlider.addEventListener('input', (e) => {
+            const slotIndex = parseInt(e.target.value);
+            const hours = Math.floor(slotIndex / 2);
+            const mins = (slotIndex % 2) * 30;
+            deskState.previewTime = `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+            document.getElementById('timePreviewLabel').textContent = deskState.previewTime;
+            renderFloorMap();
+        });
+        
+        // Desk type change handler
+        deskTypeSelect.addEventListener('change', (e) => {
+            const teamGroup = document.getElementById('assignedTeamGroup');
+            teamGroup.style.display = e.target.value === 'team_seat' ? 'block' : 'none';
+        });
+        
+        // Toolbar button handlers
+        document.querySelectorAll('.toolbar-btn[data-tool]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tool = btn.dataset.tool;
+                if (tool === 'desk') {
+                    openDeskModal();
+                } else if (tool === 'room') {
+                    openRoomModal();
+                } else if (tool === 'wall') {
+                    addWallElement();
+                } else if (tool === 'label') {
+                    openLabelModal();
+                }
+            });
+        });
+        
+        // Delete button
+        document.getElementById('deleteSelectedBtn')?.addEventListener('click', deleteSelectedElement);
+        
+        // Apply button for desk selection
+        document.getElementById('applyDeskBtn')?.addEventListener('click', () => {
+            if (deskState.selectedElement) {
+                openDeskBookingModal(deskState.selectedElement.id);
+            }
+        });
+        
+        // Room and label forms
+        document.getElementById('roomForm')?.addEventListener('submit', handleRoomSubmit);
+        document.getElementById('labelForm')?.addEventListener('submit', handleLabelSubmit);
+        
+        desksViewInitialized = true;
+    }
+    
+    // Populate assigned team dropdown
+    const teamSelect = document.getElementById('assignedTeamId');
+    if (teamSelect) {
+        teamSelect.innerHTML = state.teams.map(t => 
+            `<option value="${t.id}">${t.name}</option>`
+        ).join('');
+    }
+    
+    // Set initial time slider to current time
+    const now = new Date();
+    const currentSlotIndex = now.getHours() * 2 + (now.getMinutes() >= 30 ? 1 : 0);
+    timeSlider.value = currentSlotIndex;
+    deskState.previewTime = `${String(now.getHours()).padStart(2, '0')}:${now.getMinutes() >= 30 ? '30' : '00'}`;
+    document.getElementById('timePreviewLabel').textContent = deskState.previewTime;
+    
+    loadDesks();
+}
+
+function toggleEditMode() {
+    deskState.editMode = !deskState.editMode;
+    const editPanel = document.getElementById('editModePanel');
+    const toggleBtn = document.getElementById('toggleEditMode');
+    const floorMap = document.getElementById('floorMap');
+    
+    if (deskState.editMode) {
+        editPanel.style.display = 'block';
+        toggleBtn.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            Done Editing
+        `;
+        toggleBtn.classList.add('btn-primary');
+        toggleBtn.classList.remove('btn-secondary');
+        floorMap.classList.add('edit-mode');
+    } else {
+        editPanel.style.display = 'none';
+        toggleBtn.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+            </svg>
+            Edit Layout
+        `;
+        toggleBtn.classList.remove('btn-primary');
+        toggleBtn.classList.add('btn-secondary');
+        floorMap.classList.remove('edit-mode');
+    }
+    
+    renderFloorMap();
+}
+
+function renderFloorMap() {
+    const container = document.getElementById('floorMap');
+    const myName = localStorage.getItem('employeeName') || '';
+    
+    let html = '';
+    
+    // Render floor elements (rooms, walls, labels) first (bottom layer)
+    html += deskState.floorElements.map(el => {
+        const isSelected = deskState.selectedElement?.id === el.id;
+        
+        if (el.type === 'room') {
+            const style = `left: ${el.x || 0}px; top: ${el.y || 0}px; width: ${el.width || 150}px; height: ${el.height || 120}px; ${el.color ? `border-color: ${el.color}50; background: ${el.color}08;` : ''}`;
+            const resizeHandles = deskState.editMode ? `
+                <div class="resize-handle nw" data-handle="nw"></div>
+                <div class="resize-handle ne" data-handle="ne"></div>
+                <div class="resize-handle sw" data-handle="sw"></div>
+                <div class="resize-handle se" data-handle="se"></div>
+                <div class="resize-handle n" data-handle="n"></div>
+                <div class="resize-handle s" data-handle="s"></div>
+                <div class="resize-handle e" data-handle="e"></div>
+                <div class="resize-handle w" data-handle="w"></div>
+            ` : '';
+            return `
+                <div class="floor-room ${deskState.editMode ? 'edit-mode' : ''} ${isSelected ? 'selected' : ''}" 
+                     id="element-${el.id}"
+                     style="${style}"
+                     data-element-id="${el.id}"
+                     data-element-type="room">
+                    ${el.label ? `<span class="room-label">${el.label}</span>` : ''}
+                    ${resizeHandles}
+                </div>
+            `;
+        } else if (el.type === 'wall') {
+            const style = `left: ${el.x || 0}px; top: ${el.y || 0}px; width: ${el.width || 100}px; height: ${el.height || 4}px;`;
+            const isHorizontal = (el.width || 100) > (el.height || 4);
+            const resizeHandles = deskState.editMode ? (isHorizontal ? `
+                <div class="resize-handle e" data-handle="e"></div>
+                <div class="resize-handle w" data-handle="w"></div>
+            ` : `
+                <div class="resize-handle n" data-handle="n"></div>
+                <div class="resize-handle s" data-handle="s"></div>
+            `) : '';
+            return `
+                <div class="floor-wall ${deskState.editMode ? 'edit-mode' : ''} ${isSelected ? 'selected' : ''}" 
+                     id="element-${el.id}"
+                     style="${style}"
+                     data-element-id="${el.id}"
+                     data-element-type="wall">
+                    ${resizeHandles}
+                </div>
+            `;
+        } else if (el.type === 'label') {
+            const style = `left: ${el.x || 0}px; top: ${el.y || 0}px;`;
+            return `
+                <div class="floor-label ${deskState.editMode ? 'edit-mode' : ''} ${isSelected ? 'selected' : ''}" 
+                     id="element-${el.id}"
+                     style="${style}"
+                     data-element-id="${el.id}"
+                     data-element-type="label"
+                     onclick="selectElement('${el.id}', 'label')">
+                    ${el.label || ''}
+                </div>
+            `;
+        }
+        return '';
+    }).join('');
+    
+    // Check if no desks
+    if (deskState.desks.length === 0 && deskState.floorElements.length === 0) {
+        html = `
+            <div class="no-desks-map">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                    <path d="M16 7V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v3"></path>
+                </svg>
+                <p>No floor plan configured</p>
+                <button class="btn btn-primary" onclick="toggleEditMode();">Start Editing</button>
+            </div>
+        `;
+        container.innerHTML = html;
+        return;
+    }
+    
+    // Render desks with chairs
+    html += deskState.desks.map(desk => {
+        // Find if desk is booked at the preview time
+        const booking = deskState.deskBookings.find(b => 
+            b.deskId === desk.id && 
+            b.startTime <= deskState.previewTime && 
+            b.endTime > deskState.previewTime
+        );
+        
+        const isOccupied = !!booking;
+        const isMyBooking = booking && booking.employeeName.toLowerCase() === myName.toLowerCase();
+        const isUnavailable = desk.deskType === 'unavailable';
+        const isTeamSeat = desk.deskType === 'team_seat';
+        const isHotseat = desk.deskType === 'hotseat' || !desk.deskType;
+        
+        let statusClass = '';
+        let teamColor = '';
+        let teamName = '';
+        
+        // Base type class
+        if (isUnavailable) {
+            statusClass = 'unavailable';
+        } else if (isOccupied) {
+            statusClass = isMyBooking ? 'my-booking' : 'booked';
+            if (booking.teamId) {
+                const team = state.teams.find(t => t.id === booking.teamId);
+                if (team && team.color) {
+                    teamColor = team.color;
+                    teamName = team.name;
+                }
+            }
+        } else if (isTeamSeat) {
+            statusClass = 'team-seat';
+            const team = state.teams.find(t => t.id === desk.assignedTeamId);
+            if (team) {
+                teamColor = team.color;
+                teamName = team.name;
+            }
+        } else {
+            statusClass = 'hotseat';
+        }
+        
+        const isSelected = deskState.selectedElement?.id === desk.id;
+        const chairPositions = desk.chairPositions || ['bottom'];
+        
+        let styleStr = `left: ${desk.x || 0}px; top: ${desk.y || 0}px; width: ${desk.width || 60}px; height: ${desk.height || 40}px;`;
+        if (teamColor && isOccupied) {
+            styleStr += ` border-color: ${teamColor}; background: ${teamColor}15;`;
+        }
+        
+        // Generate chair HTML
+        const chairsHtml = chairPositions.map(pos => 
+            `<div class="desk-chair ${pos}"></div>`
+        ).join('');
+        
+        return `
+            <div class="floor-desk ${statusClass} ${isSelected ? 'selected' : ''} ${deskState.editMode ? 'draggable' : ''}" 
+                 id="desk-${desk.id}"
+                 style="${styleStr}"
+                 data-desk-id="${desk.id}"
+                 onclick="handleDeskClick('${desk.id}')"
+                 title="${isOccupied ? `${booking.employeeName}${teamName ? ' (' + teamName + ')' : ''}\n${booking.startTime} - ${booking.endTime}` : isUnavailable ? 'Unavailable' : isTeamSeat ? `Team: ${teamName}` : 'Click to book'}">
+                ${chairsHtml}
+                <div class="desk-label">${desk.name}</div>
+                ${isOccupied ? `<div class="desk-occupant">${booking.employeeName}</div>` : ''}
+                ${deskState.editMode ? `
+                    <div class="desk-edit-controls">
+                        <button onclick="event.stopPropagation(); deleteDesk('${desk.id}')" title="Delete">×</button>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    }).join('');
+    
+    container.innerHTML = html;
+    
+    // Add drag handlers in edit mode
+    if (deskState.editMode) {
+        setupDeskDragging();
+        setupElementDragging();
+    }
+}
+
+function handleDeskClick(deskId) {
+    const desk = deskState.desks.find(d => d.id === deskId);
+    if (!desk) return;
+    
+    if (deskState.editMode) {
+        editDesk(deskId);
+        return;
+    }
+    
+    // Don't allow booking unavailable desks
+    if (desk.deskType === 'unavailable') {
+        showToast('This desk is unavailable', 'error');
+        return;
+    }
+    
+    // Check team seat restrictions
+    if (desk.deskType === 'team_seat') {
+        const savedTeamId = localStorage.getItem('employeeTeamId');
+        if (savedTeamId !== desk.assignedTeamId) {
+            const team = state.teams.find(t => t.id === desk.assignedTeamId);
+            showToast(`This desk is reserved for ${team?.name || 'a specific team'}`, 'warning');
+            // Still allow booking but show warning
+        }
+    }
+    
+    // Select desk and show bottom panel
+    deskState.selectedElement = desk;
+    document.getElementById('selectedDeskName').textContent = desk.name;
+    document.getElementById('selectedDeskPanel').style.display = 'flex';
+    
+    // Highlight selected desk
+    renderFloorMap();
+}
+
+function selectElement(elementId, elementType) {
+    if (!deskState.editMode) return;
+    
+    const element = deskState.floorElements.find(e => e.id === elementId);
+    if (!element) return;
+    
+    deskState.selectedElement = { ...element, elementType };
+    
+    // Update UI
+    document.getElementById('selectedElementInfo').textContent = `${elementType}: ${element.label || elementId}`;
+    document.getElementById('deleteSelectedBtn').style.display = 'flex';
+    
+    // Re-render to show selection without full reload
+    document.querySelectorAll('.floor-room, .floor-wall, .floor-label').forEach(el => {
+        el.classList.remove('selected');
+    });
+    const elDiv = document.getElementById(`element-${elementId}`);
+    if (elDiv) elDiv.classList.add('selected');
+}
+
+// Handle click on floor elements (separate from drag)
+function handleFloorElementClick(e) {
+    if (!deskState.editMode) return;
+    if (dragState.active) return; // Don't select if dragging
+    
+    const element = e.target.closest('.floor-room, .floor-wall, .floor-label');
+    if (!element) return;
+    
+    const elementId = element.dataset.elementId;
+    const elementType = element.dataset.elementType;
+    
+    if (elementId && elementType) {
+        selectElement(elementId, elementType);
+    }
+}
+
+async function deleteSelectedElement() {
+    if (!deskState.selectedElement) return;
+    
+    const el = deskState.selectedElement;
+    
+    if (el.elementType) {
+        // Floor element
+        if (!confirm(`Delete this ${el.elementType}?`)) return;
+        try {
+            await fetch(`/api/floor-elements/${el.id}`, { method: 'DELETE' });
+            showToast(`${el.elementType} deleted`, 'success');
+            loadDesks();
+        } catch (error) {
+            showToast('Failed to delete', 'error');
+        }
+    } else {
+        // Desk
+        deleteDesk(el.id);
+    }
+    
+    deskState.selectedElement = null;
+    document.getElementById('selectedElementInfo').textContent = 'None';
+    document.getElementById('deleteSelectedBtn').style.display = 'none';
+}
+
+// Global drag state to avoid listener conflicts
+let dragState = {
+    active: false,
+    didMove: false, // Track if we actually moved
+    type: null, // 'move' or 'resize'
+    elementId: null,
+    elementType: null,
+    startX: 0,
+    startY: 0,
+    initialX: 0,
+    initialY: 0,
+    initialWidth: 0,
+    initialHeight: 0,
+    resizeHandle: null
+};
+
+function setupElementDragging() {
+    const floorMap = document.getElementById('floorMap');
+    
+    // Use a flag to track if we've added listeners
+    if (!floorMap.dataset.listenersAdded) {
+        floorMap.addEventListener('mousedown', handleElementMouseDown);
+        floorMap.addEventListener('click', handleFloorElementClick);
+        document.addEventListener('mousemove', handleElementMouseMove);
+        document.addEventListener('mouseup', handleElementMouseUp);
+        floorMap.dataset.listenersAdded = 'true';
+    }
+}
+
+function handleElementMouseDown(e) {
+    if (!deskState.editMode) return;
+    
+    const target = e.target;
+    const floorMap = document.getElementById('floorMap');
+    const mapRect = floorMap.getBoundingClientRect();
+    
+    // Check if clicking on a resize handle
+    if (target.classList.contains('resize-handle')) {
+        const parent = target.closest('.floor-room, .floor-wall');
+        if (!parent) return;
+        
+        const rect = parent.getBoundingClientRect();
+        dragState = {
+            active: true,
+            didMove: false,
+            type: 'resize',
+            elementId: parent.dataset.elementId,
+            elementType: parent.dataset.elementType,
+            startX: e.clientX,
+            startY: e.clientY,
+            initialX: parseInt(parent.style.left) || 0,
+            initialY: parseInt(parent.style.top) || 0,
+            initialWidth: parseInt(parent.style.width) || 100,
+            initialHeight: parseInt(parent.style.height) || 100,
+            resizeHandle: target.dataset.handle
+        };
+        
+        parent.classList.add('resizing');
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+    }
+    
+    // Check if clicking on a draggable element
+    const element = target.closest('.floor-room.edit-mode, .floor-wall.edit-mode, .floor-label.edit-mode');
+    if (!element) return;
+    
+    const rect = element.getBoundingClientRect();
+    
+    dragState = {
+        active: true,
+        didMove: false,
+        type: 'move',
+        elementId: element.dataset.elementId,
+        elementType: element.dataset.elementType,
+        startX: e.clientX,
+        startY: e.clientY,
+        initialX: rect.left - mapRect.left + floorMap.scrollLeft,
+        initialY: rect.top - mapRect.top + floorMap.scrollTop,
+        initialWidth: parseInt(element.style.width) || 100,
+        initialHeight: parseInt(element.style.height) || 100,
+        resizeHandle: null
+    };
+    
+    element.classList.add('dragging');
+    e.preventDefault();
+    e.stopPropagation();
+}
+
+function handleElementMouseMove(e) {
+    if (!dragState.active) return;
+    
+    const element = document.getElementById(`element-${dragState.elementId}`);
+    if (!element) return;
+    
+    const deltaX = e.clientX - dragState.startX;
+    const deltaY = e.clientY - dragState.startY;
+    
+    // Track if we've moved enough to count as a drag
+    if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) {
+        dragState.didMove = true;
+    }
+    
+    if (dragState.type === 'move') {
+        let newX = dragState.initialX + deltaX;
+        let newY = dragState.initialY + deltaY;
+        
+        // Snap to grid (10px)
+        newX = Math.round(newX / 10) * 10;
+        newY = Math.round(newY / 10) * 10;
+        newX = Math.max(0, newX);
+        newY = Math.max(0, newY);
+        
+        element.style.left = `${newX}px`;
+        element.style.top = `${newY}px`;
+    } else if (dragState.type === 'resize') {
+        let newWidth = dragState.initialWidth;
+        let newHeight = dragState.initialHeight;
+        let newX = dragState.initialX;
+        let newY = dragState.initialY;
+        
+        const handle = dragState.resizeHandle;
+        
+        if (handle.includes('e')) {
+            newWidth = Math.max(30, dragState.initialWidth + deltaX);
+        }
+        if (handle.includes('w')) {
+            const widthDelta = -deltaX;
+            newWidth = Math.max(30, dragState.initialWidth + widthDelta);
+            if (newWidth > 30) {
+                newX = dragState.initialX - widthDelta;
+            }
+        }
+        if (handle.includes('s')) {
+            newHeight = Math.max(4, dragState.initialHeight + deltaY);
+        }
+        if (handle.includes('n')) {
+            const heightDelta = -deltaY;
+            newHeight = Math.max(4, dragState.initialHeight + heightDelta);
+            if (newHeight > 4) {
+                newY = dragState.initialY - heightDelta;
+            }
+        }
+        
+        // Snap to grid
+        newWidth = Math.round(newWidth / 10) * 10;
+        newHeight = Math.round(newHeight / 10) * 10;
+        newX = Math.round(newX / 10) * 10;
+        newY = Math.round(newY / 10) * 10;
+        
+        element.style.width = `${newWidth}px`;
+        element.style.height = `${newHeight}px`;
+        element.style.left = `${newX}px`;
+        element.style.top = `${newY}px`;
+    }
+}
+
+async function handleElementMouseUp(e) {
+    if (!dragState.active) return;
+    
+    const element = document.getElementById(`element-${dragState.elementId}`);
+    if (element) {
+        element.classList.remove('dragging', 'resizing');
+        
+        // Only save if we actually moved/resized
+        if (dragState.didMove) {
+            const newX = parseInt(element.style.left) || 0;
+            const newY = parseInt(element.style.top) || 0;
+            const newWidth = parseInt(element.style.width) || 100;
+            const newHeight = parseInt(element.style.height) || 100;
+            
+            try {
+                const response = await fetch(`/api/floor-elements/${dragState.elementId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ x: newX, y: newY, width: newWidth, height: newHeight })
+                });
+                
+                if (response.ok) {
+                    // Update local state
+                    const idx = deskState.floorElements.findIndex(el => el.id === dragState.elementId);
+                    if (idx !== -1) {
+                        deskState.floorElements[idx].x = newX;
+                        deskState.floorElements[idx].y = newY;
+                        deskState.floorElements[idx].width = newWidth;
+                        deskState.floorElements[idx].height = newHeight;
+                    }
+                    console.log('Element position saved:', { x: newX, y: newY, width: newWidth, height: newHeight });
+                }
+            } catch (error) {
+                console.error('Failed to save element position:', error);
+                showToast('Failed to save position', 'error');
+            }
+        }
+    }
+    
+    // Reset drag state
+    dragState = {
+        active: false,
+        didMove: false,
+        type: null,
+        elementId: null,
+        elementType: null,
+        startX: 0,
+        startY: 0,
+        initialX: 0,
+        initialY: 0,
+        initialWidth: 0,
+        initialHeight: 0,
+        resizeHandle: null
+    };
+}
+
+function setupDeskDragging() {
+    const floorMap = document.getElementById('floorMap');
+    const desks = floorMap.querySelectorAll('.floor-desk.draggable');
+    
+    desks.forEach(deskEl => {
+        let isDragging = false;
+        let startX, startY, initialX, initialY;
+        
+        deskEl.addEventListener('mousedown', (e) => {
+            if (e.target.tagName === 'BUTTON') return;
+            
+            isDragging = true;
+            deskEl.classList.add('dragging');
+            
+            const rect = deskEl.getBoundingClientRect();
+            const mapRect = floorMap.getBoundingClientRect();
+            
+            startX = e.clientX;
+            startY = e.clientY;
+            initialX = rect.left - mapRect.left;
+            initialY = rect.top - mapRect.top;
+            
+            e.preventDefault();
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            
+            const deltaX = e.clientX - startX;
+            const deltaY = e.clientY - startY;
+            
+            let newX = initialX + deltaX;
+            let newY = initialY + deltaY;
+            
+            // Snap to grid (10px)
+            newX = Math.round(newX / 10) * 10;
+            newY = Math.round(newY / 10) * 10;
+            
+            // Keep within bounds
+            newX = Math.max(0, newX);
+            newY = Math.max(0, newY);
+            
+            deskEl.style.left = `${newX}px`;
+            deskEl.style.top = `${newY}px`;
+        });
+        
+        document.addEventListener('mouseup', async () => {
+            if (!isDragging) return;
+            
+            isDragging = false;
+            deskEl.classList.remove('dragging');
+            
+            // Save new position
+            const deskId = deskEl.dataset.deskId;
+            const newX = parseInt(deskEl.style.left);
+            const newY = parseInt(deskEl.style.top);
+            
+            try {
+                await fetch(`/api/desks/${deskId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ x: newX, y: newY })
+                });
+                
+                // Update local state
+                const desk = deskState.desks.find(d => d.id === deskId);
+                if (desk) {
+                    desk.x = newX;
+                    desk.y = newY;
+                }
+            } catch (error) {
+                console.error('Failed to save desk position:', error);
+            }
+        });
+    });
+}
+
+// Keep the old grid view function as a fallback
+function renderDesksGrid() {
+    renderFloorMap();
+}
+
+function openDeskModal(deskId = null) {
+    const modal = document.getElementById('deskModal');
+    const title = document.getElementById('deskModalTitle');
+    const submitBtn = document.getElementById('deskFormSubmitBtn');
+    const locationInput = document.getElementById('deskLocationInput');
+    const deskTypeSelect = document.getElementById('deskType');
+    const assignedTeamGroup = document.getElementById('assignedTeamGroup');
+    const assignedTeamSelect = document.getElementById('assignedTeamId');
+    
+    // Populate location select with current location selected
+    locationInput.innerHTML = state.locations.map(loc => 
+        `<option value="${loc.id}" ${loc.id === state.currentLocation ? 'selected' : ''}>${loc.name}</option>`
+    ).join('');
+    
+    // Populate team select
+    assignedTeamSelect.innerHTML = state.teams.map(t => 
+        `<option value="${t.id}">${t.name}</option>`
+    ).join('');
+    
+    if (deskId) {
+        const desk = deskState.desks.find(d => d.id === deskId);
+        if (desk) {
+            document.getElementById('editDeskId').value = desk.id;
+            document.getElementById('deskName').value = desk.name;
+            document.getElementById('deskFloor').value = desk.floor || deskState.currentFloor;
+            document.getElementById('deskZone').value = desk.zone || '';
+            document.getElementById('deskWidth').value = desk.width || 60;
+            document.getElementById('deskHeight').value = desk.height || 40;
+            deskTypeSelect.value = desk.deskType || 'hotseat';
+            assignedTeamGroup.style.display = desk.deskType === 'team_seat' ? 'block' : 'none';
+            if (desk.assignedTeamId) assignedTeamSelect.value = desk.assignedTeamId;
+            locationInput.value = desk.locationId;
+            
+            // Set chair positions
+            document.querySelectorAll('input[name="chairPos"]').forEach(cb => {
+                cb.checked = (desk.chairPositions || ['bottom']).includes(cb.value);
+            });
+            
+            title.textContent = 'Edit Desk';
+            submitBtn.textContent = 'Save Changes';
+        }
+    } else {
+        document.getElementById('deskForm').reset();
+        document.getElementById('editDeskId').value = '';
+        document.getElementById('deskFloor').value = deskState.currentFloor;
+        document.getElementById('deskWidth').value = 60;
+        document.getElementById('deskHeight').value = 40;
+        deskTypeSelect.value = 'hotseat';
+        assignedTeamGroup.style.display = 'none';
+        
+        // Reset chair positions to default
+        document.querySelectorAll('input[name="chairPos"]').forEach(cb => {
+            cb.checked = cb.value === 'bottom';
+        });
+        
+        title.textContent = 'Add Desk';
+        submitBtn.textContent = 'Add Desk';
+    }
+    
+    modal.classList.add('active');
+}
+
+function closeDeskModal() {
+    document.getElementById('deskModal').classList.remove('active');
+    document.getElementById('deskForm').reset();
+    document.getElementById('editDeskId').value = '';
+}
+
+async function handleDeskSubmit(e) {
+    e.preventDefault();
+    
+    const editDeskId = document.getElementById('editDeskId').value;
+    const name = document.getElementById('deskName').value;
+    const locationId = document.getElementById('deskLocationInput').value;
+    const floor = document.getElementById('deskFloor').value || deskState.currentFloor;
+    const zone = document.getElementById('deskZone').value;
+    const width = parseInt(document.getElementById('deskWidth').value) || 60;
+    const height = parseInt(document.getElementById('deskHeight').value) || 40;
+    const deskType = document.getElementById('deskType').value;
+    const assignedTeamId = deskType === 'team_seat' ? document.getElementById('assignedTeamId').value : null;
+    
+    // Get chair positions
+    const chairPositions = Array.from(document.querySelectorAll('input[name="chairPos"]:checked'))
+        .map(cb => cb.value);
+    
+    // Calculate initial position for new desks (grid layout)
+    const existingDesks = deskState.desks;
+    const x = existingDesks.length > 0 ? (existingDesks.length % 8) * 90 + 50 : 50;
+    const y = existingDesks.length > 0 ? Math.floor(existingDesks.length / 8) * 80 + 80 : 80;
+    
+    const deskData = { 
+        name, locationId, floor, zone, width, height, 
+        deskType, assignedTeamId, chairPositions 
+    };
+    
+    try {
+        let response;
+        if (editDeskId) {
+            response = await fetch(`/api/desks/${editDeskId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(deskData)
+            });
+        } else {
+            response = await fetch('/api/desks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...deskData, x, y })
+            });
+        }
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error);
+        }
+        
+        showToast(editDeskId ? 'Desk updated' : 'Desk created', 'success');
+        closeDeskModal();
+        loadDesks();
+        
+    } catch (error) {
+        showToast(error.message || 'Failed to save desk', 'error');
+    }
+}
+
+function editDesk(deskId) {
+    openDeskModal(deskId);
+}
+
+async function deleteDesk(deskId) {
+    if (!confirm('Delete this desk? All bookings for this desk will also be deleted.')) return;
+    
+    try {
+        await fetch(`/api/desks/${deskId}`, { method: 'DELETE' });
+        showToast('Desk deleted', 'success');
+        loadDesks();
+    } catch (error) {
+        showToast('Failed to delete desk', 'error');
+    }
+}
+
+// Room modal functions
+function openRoomModal(roomId = null) {
+    const modal = document.getElementById('roomModal');
+    const form = document.getElementById('roomForm');
+    
+    if (roomId) {
+        const room = deskState.floorElements.find(e => e.id === roomId);
+        if (room) {
+            document.getElementById('editRoomId').value = room.id;
+            document.getElementById('roomLabel').value = room.label || '';
+            document.getElementById('roomWidth').value = room.width || 150;
+            document.getElementById('roomHeight').value = room.height || 120;
+            document.getElementById('roomColor').value = room.color || '#3b82f6';
+        }
+    } else {
+        form.reset();
+        document.getElementById('editRoomId').value = '';
+    }
+    
+    modal.classList.add('active');
+}
+
+function closeRoomModal() {
+    document.getElementById('roomModal').classList.remove('active');
+}
+
+async function handleRoomSubmit(e) {
+    e.preventDefault();
+    
+    const editRoomId = document.getElementById('editRoomId').value;
+    const label = document.getElementById('roomLabel').value;
+    const width = parseInt(document.getElementById('roomWidth').value);
+    const height = parseInt(document.getElementById('roomHeight').value);
+    const color = document.getElementById('roomColor').value;
+    
+    const roomData = {
+        type: 'room',
+        locationId: state.currentLocation,
+        floor: deskState.currentFloor,
+        label,
+        width,
+        height,
+        color,
+        x: 50,
+        y: 50
+    };
+    
+    try {
+        if (editRoomId) {
+            await fetch(`/api/floor-elements/${editRoomId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(roomData)
+            });
+        } else {
+            await fetch('/api/floor-elements', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(roomData)
+            });
+        }
+        
+        showToast(editRoomId ? 'Room updated' : 'Room added', 'success');
+        closeRoomModal();
+        loadDesks();
+    } catch (error) {
+        showToast('Failed to save room', 'error');
+    }
+}
+
+// Wall functions
+async function addWallElement() {
+    try {
+        await fetch('/api/floor-elements', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                type: 'wall',
+                locationId: state.currentLocation,
+                floor: deskState.currentFloor,
+                x: 100,
+                y: 100,
+                width: 100,
+                height: 4
+            })
+        });
+        
+        showToast('Wall added - drag to position', 'success');
+        loadDesks();
+    } catch (error) {
+        showToast('Failed to add wall', 'error');
+    }
+}
+
+// Label modal functions
+function openLabelModal(labelId = null) {
+    const modal = document.getElementById('labelModal');
+    const form = document.getElementById('labelForm');
+    
+    if (labelId) {
+        const label = deskState.floorElements.find(e => e.id === labelId);
+        if (label) {
+            document.getElementById('editLabelId').value = label.id;
+            document.getElementById('labelText').value = label.label || '';
+        }
+    } else {
+        form.reset();
+        document.getElementById('editLabelId').value = '';
+    }
+    
+    modal.classList.add('active');
+}
+
+function closeLabelModal() {
+    document.getElementById('labelModal').classList.remove('active');
+}
+
+async function handleLabelSubmit(e) {
+    e.preventDefault();
+    
+    const editLabelId = document.getElementById('editLabelId').value;
+    const labelText = document.getElementById('labelText').value;
+    
+    const labelData = {
+        type: 'label',
+        locationId: state.currentLocation,
+        floor: deskState.currentFloor,
+        label: labelText,
+        x: 100,
+        y: 100
+    };
+    
+    try {
+        if (editLabelId) {
+            await fetch(`/api/floor-elements/${editLabelId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(labelData)
+            });
+        } else {
+            await fetch('/api/floor-elements', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(labelData)
+            });
+        }
+        
+        showToast(editLabelId ? 'Label updated' : 'Label added', 'success');
+        closeLabelModal();
+        loadDesks();
+    } catch (error) {
+        showToast('Failed to save label', 'error');
+    }
+}
+
+// Generate time options for dropdowns (00:00 - 23:30 in 30-min increments)
+function generateTimeOptions() {
+    const times = [];
+    for (let hour = 0; hour < 24; hour++) {
+        times.push(`${String(hour).padStart(2, '0')}:00`);
+        times.push(`${String(hour).padStart(2, '0')}:30`);
+    }
+    return times;
+}
+
+function openDeskBookingModal(deskId) {
+    const desk = deskState.desks.find(d => d.id === deskId);
+    if (!desk) return;
+    
+    const modal = document.getElementById('deskBookingModal');
+    const infoDiv = document.getElementById('deskBookingInfo');
+    const location = state.locations.find(l => l.id === desk.locationId);
+    
+    document.getElementById('bookingDeskId').value = deskId;
+    document.getElementById('bookingDate').value = deskState.selectedDate;
+    
+    // Load saved name from localStorage
+    const savedName = localStorage.getItem('employeeName');
+    const savedEmail = localStorage.getItem('employeeEmail');
+    const savedTeamId = localStorage.getItem('employeeTeamId');
+    if (savedName) document.getElementById('employeeName').value = savedName;
+    if (savedEmail) document.getElementById('employeeEmail').value = savedEmail;
+    
+    // Populate team selector
+    const teamSelect = document.getElementById('deskBookingTeam');
+    teamSelect.innerHTML = '<option value="">-- No team --</option>' + 
+        state.teams.map(team => 
+            `<option value="${team.id}" ${team.id === savedTeamId ? 'selected' : ''} style="color: ${team.color}">${team.name}</option>`
+        ).join('');
+    
+    infoDiv.innerHTML = `
+        <h3>${desk.name}</h3>
+        <p>${location?.name || ''} ${desk.floor ? `• Floor ${desk.floor}` : ''} ${desk.zone ? `• ${desk.zone}` : ''}</p>
+        <p class="booking-date">${new Date(deskState.selectedDate).toLocaleDateString('en-ZA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+    `;
+    
+    // Initialize time range picker
+    initTimeRangePicker(deskId);
+    renderAvailabilityTimeline(deskId);
+    renderDeskBookingsList(deskId);
+    
+    modal.classList.add('active');
+}
+
+function initTimeRangePicker(deskId) {
+    const startSelect = document.getElementById('startTimeSelect');
+    const endSelect = document.getElementById('endTimeSelect');
+    const times = generateTimeOptions();
+    
+    // Find first available slot
+    const deskBookings = deskState.deskBookings.filter(b => b.deskId === deskId);
+    const bookedTimes = new Set(deskBookings.map(b => b.startTime));
+    
+    // Get current time for today
+    const today = formatDateStr(new Date());
+    const now = new Date();
+    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${now.getMinutes() < 30 ? '00' : '30'}`;
+    
+    // Build start time options (exclude end time 17:00)
+    const startTimes = times.slice(0, -1);
+    startSelect.innerHTML = startTimes.map(time => {
+        const isPast = deskState.selectedDate === today && time < currentTime;
+        const isBooked = bookedTimes.has(time);
+        const disabled = isPast || isBooked;
+        return `<option value="${time}" ${disabled ? 'disabled' : ''}>${time}${isBooked ? ' (booked)' : ''}</option>`;
+    }).join('');
+    
+    // Set default to first available time
+    const firstAvailable = startTimes.find(time => {
+        const isPast = deskState.selectedDate === today && time < currentTime;
+        return !isPast && !bookedTimes.has(time);
+    });
+    if (firstAvailable) startSelect.value = firstAvailable;
+    
+    // Update end time options based on start time
+    updateEndTimeOptions(deskId);
+    
+    // Add change listeners
+    startSelect.onchange = () => {
+        updateEndTimeOptions(deskId);
+        updateTimeRangeSummary();
+    };
+    endSelect.onchange = () => updateTimeRangeSummary();
+    
+    updateTimeRangeSummary();
+}
+
+function updateEndTimeOptions(deskId) {
+    const startSelect = document.getElementById('startTimeSelect');
+    const endSelect = document.getElementById('endTimeSelect');
+    const startTime = startSelect.value;
+    const times = generateTimeOptions();
+    const deskBookings = deskState.deskBookings.filter(b => b.deskId === deskId);
+    
+    // Find the next booked slot after start time
+    const bookedAfterStart = deskBookings
+        .filter(b => b.startTime > startTime)
+        .sort((a, b) => a.startTime.localeCompare(b.startTime));
+    
+    const nextBookedTime = bookedAfterStart.length > 0 ? bookedAfterStart[0].startTime : null;
+    
+    // End times must be after start time and before next booking
+    const startIndex = times.indexOf(startTime);
+    const validEndTimes = times.slice(startIndex + 1).filter(time => {
+        if (nextBookedTime && time > nextBookedTime) return false;
+        return true;
+    });
+    
+    endSelect.innerHTML = validEndTimes.map(time => 
+        `<option value="${time}">${time}</option>`
+    ).join('');
+    
+    // Default to 1 hour later if available, otherwise first option
+    const oneHourLater = addMinutesToTime(startTime, 60);
+    if (validEndTimes.includes(oneHourLater)) {
+        endSelect.value = oneHourLater;
+    }
+}
+
+function addMinutesToTime(time, minutes) {
+    const [h, m] = time.split(':').map(Number);
+    const totalMins = h * 60 + m + minutes;
+    const newH = Math.floor(totalMins / 60);
+    const newM = totalMins % 60;
+    return `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}`;
+}
+
+function updateTimeRangeSummary() {
+    const startTime = document.getElementById('startTimeSelect').value;
+    const endTime = document.getElementById('endTimeSelect').value;
+    const container = document.getElementById('timeRangeSummary');
+    
+    if (!startTime || !endTime) {
+        container.innerHTML = '';
+        return;
+    }
+    
+    // Calculate duration
+    const [startH, startM] = startTime.split(':').map(Number);
+    const [endH, endM] = endTime.split(':').map(Number);
+    const durationMins = (endH * 60 + endM) - (startH * 60 + startM);
+    const hours = Math.floor(durationMins / 60);
+    const mins = durationMins % 60;
+    
+    let durationText = '';
+    if (hours > 0) durationText += `${hours} hour${hours > 1 ? 's' : ''}`;
+    if (mins > 0) durationText += `${hours > 0 ? ' ' : ''}${mins} min`;
+    
+    container.innerHTML = `
+        <div class="summary-badge">
+            <span class="summary-time">${startTime} - ${endTime}</span>
+            <span class="summary-duration">${durationText}</span>
+        </div>
+    `;
+}
+
+function renderAvailabilityTimeline(deskId) {
+    const container = document.getElementById('availabilityTimeline');
+    const deskBookings = deskState.deskBookings.filter(b => b.deskId === deskId);
+    const times = generateTimeOptions().slice(0, -1); // Exclude 17:00 as it's end-only
+    
+    const today = formatDateStr(new Date());
+    const now = new Date();
+    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${now.getMinutes() < 30 ? '00' : '30'}`;
+    
+    container.innerHTML = times.map(time => {
+        const booking = deskBookings.find(b => b.startTime === time);
+        const isPast = deskState.selectedDate === today && time < currentTime;
+        
+        let className = 'timeline-slot';
+        let tooltip = time;
+        
+        if (booking) {
+            className += ' booked';
+            tooltip = `${time} - ${booking.employeeName}`;
+        } else if (isPast) {
+            className += ' past';
+            tooltip = `${time} - Past`;
+        } else {
+            className += ' available';
+            tooltip = `${time} - Available`;
+        }
+        
+        return `<div class="${className}" title="${tooltip}"></div>`;
+    }).join('');
+    
+    // Add legend
+    container.innerHTML += `
+        <div class="timeline-legend">
+            <span><span class="legend-dot available"></span> Available</span>
+            <span><span class="legend-dot booked"></span> Booked</span>
+            <span><span class="legend-dot past"></span> Past</span>
+        </div>
+    `;
+}
+
+function closeDeskBookingModal() {
+    document.getElementById('deskBookingModal').classList.remove('active');
+    document.getElementById('deskBookingForm').reset();
+}
+
+async function handleDeskBookingSubmit(e) {
+    e.preventDefault();
+    
+    const deskId = document.getElementById('bookingDeskId').value;
+    const date = document.getElementById('bookingDate').value;
+    const startTime = document.getElementById('startTimeSelect').value;
+    const endTime = document.getElementById('endTimeSelect').value;
+    const employeeName = document.getElementById('employeeName').value;
+    const employeeEmail = document.getElementById('employeeEmail').value;
+    const teamId = document.getElementById('deskBookingTeam').value || null;
+    
+    if (!startTime || !endTime) {
+        showToast('Please select a time range', 'error');
+        return;
+    }
+    
+    // Save to localStorage for convenience
+    localStorage.setItem('employeeName', employeeName);
+    if (employeeEmail) localStorage.setItem('employeeEmail', employeeEmail);
+    if (teamId) localStorage.setItem('employeeTeamId', teamId);
+    
+    try {
+        // Generate all 30-min slots between start and end
+        const slots = [];
+        let current = startTime;
+        while (current < endTime) {
+            const next = addMinutesToTime(current, 30);
+            slots.push({ start: current, end: next });
+            current = next;
+        }
+        
+        // Book each slot
+        for (const slot of slots) {
+            const response = await fetch('/api/desk-bookings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    deskId,
+                    date,
+                    startTime: slot.start,
+                    endTime: slot.end,
+                    employeeName,
+                    employeeEmail,
+                    teamId
+                })
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error);
+            }
+        }
+        
+        showToast(`Booked ${startTime} - ${endTime}`, 'success');
+        
+        // Reload bookings
+        const bookingsResponse = await fetch(`/api/desk-bookings?locationId=${state.currentLocation}&date=${date}`);
+        deskState.deskBookings = await bookingsResponse.json();
+        
+        // Refresh the modal
+        initTimeRangePicker(deskId);
+        renderAvailabilityTimeline(deskId);
+        renderDeskBookingsList(deskId);
+        renderDesksGrid();
+        
+    } catch (error) {
+        showToast(error.message || 'Failed to book desk', 'error');
+    }
+}
+
+function renderDeskBookingsList(deskId) {
+    const container = document.getElementById('deskBookingsList');
+    const deskBookings = deskState.deskBookings.filter(b => b.deskId === deskId);
+    
+    if (deskBookings.length === 0) {
+        container.innerHTML = '<p class="hint">No bookings for this day</p>';
+        return;
+    }
+    
+    // Group consecutive bookings by the same person into time ranges
+    const groupedBookings = groupConsecutiveBookings(deskBookings);
+    
+    container.innerHTML = groupedBookings.map(group => {
+        const isCheckedIn = group.bookings.some(b => b.checkedIn);
+        const bookingIds = group.bookings.map(b => b.id).join(',');
+        
+        return `
+            <div class="desk-booking-item ${isCheckedIn ? 'checked-in' : ''}">
+                <div class="booking-time">${group.startTime} - ${group.endTime}</div>
+                <div class="booking-person">${group.employeeName}</div>
+                <div class="booking-duration">${calculateDuration(group.startTime, group.endTime)}</div>
+                ${isCheckedIn ? '<span class="checked-in-badge">Checked In</span>' : ''}
+                <button class="btn btn-small btn-danger" onclick="cancelDeskBookingRange('${bookingIds}', '${deskId}')">Cancel</button>
+            </div>
+        `;
+    }).join('');
+}
+
+function groupConsecutiveBookings(bookings) {
+    if (bookings.length === 0) return [];
+    
+    // Sort by start time
+    const sorted = [...bookings].sort((a, b) => a.startTime.localeCompare(b.startTime));
+    
+    const groups = [];
+    let currentGroup = {
+        employeeName: sorted[0].employeeName,
+        startTime: sorted[0].startTime,
+        endTime: sorted[0].endTime,
+        bookings: [sorted[0]]
+    };
+    
+    for (let i = 1; i < sorted.length; i++) {
+        const booking = sorted[i];
+        
+        // Check if this booking is consecutive and by the same person
+        if (booking.employeeName === currentGroup.employeeName && 
+            booking.startTime === currentGroup.endTime) {
+            // Extend the current group
+            currentGroup.endTime = booking.endTime;
+            currentGroup.bookings.push(booking);
+        } else {
+            // Start a new group
+            groups.push(currentGroup);
+            currentGroup = {
+                employeeName: booking.employeeName,
+                startTime: booking.startTime,
+                endTime: booking.endTime,
+                bookings: [booking]
+            };
+        }
+    }
+    
+    // Don't forget the last group
+    groups.push(currentGroup);
+    
+    return groups;
+}
+
+function calculateDuration(startTime, endTime) {
+    const [startH, startM] = startTime.split(':').map(Number);
+    const [endH, endM] = endTime.split(':').map(Number);
+    const durationMins = (endH * 60 + endM) - (startH * 60 + startM);
+    const hours = Math.floor(durationMins / 60);
+    const mins = durationMins % 60;
+    
+    let text = '';
+    if (hours > 0) text += `${hours}h`;
+    if (mins > 0) text += `${hours > 0 ? ' ' : ''}${mins}m`;
+    return text || '0m';
+}
+
+async function cancelDeskBookingRange(bookingIds, deskId) {
+    const ids = bookingIds.split(',');
+    const slotCount = ids.length;
+    
+    if (!confirm(`Cancel this booking? (${slotCount} slot${slotCount > 1 ? 's' : ''})`)) return;
+    
+    try {
+        // Cancel all bookings in the range
+        for (const id of ids) {
+            await fetch(`/api/desk-bookings/${id}`, { method: 'DELETE' });
+        }
+        
+        showToast('Booking cancelled', 'success');
+        
+        // Reload
+        const date = deskState.selectedDate;
+        const bookingsResponse = await fetch(`/api/desk-bookings?locationId=${state.currentLocation}&date=${date}`);
+        deskState.deskBookings = await bookingsResponse.json();
+        
+        initTimeRangePicker(deskId);
+        renderAvailabilityTimeline(deskId);
+        renderDeskBookingsList(deskId);
+        renderDesksGrid();
+        
+    } catch (error) {
+        showToast('Failed to cancel booking', 'error');
+    }
+}
+
+async function cancelDeskBooking(bookingId, deskId) {
+    if (!confirm('Cancel this booking?')) return;
+    
+    try {
+        await fetch(`/api/desk-bookings/${bookingId}`, { method: 'DELETE' });
+        showToast('Booking cancelled', 'success');
+        
+        // Reload
+        const date = deskState.selectedDate;
+        const bookingsResponse = await fetch(`/api/desk-bookings?locationId=${state.currentLocation}&date=${date}`);
+        deskState.deskBookings = await bookingsResponse.json();
+        
+        initTimeRangePicker(deskId);
+        renderAvailabilityTimeline(deskId);
+        renderDeskBookingsList(deskId);
+        renderDesksGrid();
+        
+    } catch (error) {
+        showToast('Failed to cancel booking', 'error');
+    }
+}
+
+function showDeskQR(deskId) {
+    const desk = deskState.desks.find(d => d.id === deskId);
+    if (!desk) return;
+    
+    const qrUrl = `${window.location.origin}/checkin.html?code=${desk.qrCode}`;
+    
+    // Generate QR code using a free API
+    const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrUrl)}`;
+    
+    // Create a modal to show the QR code
+    const modal = document.createElement('div');
+    modal.className = 'modal active';
+    modal.id = 'qrModal';
+    modal.innerHTML = `
+        <div class="modal-content modal-small" style="text-align: center;">
+            <div class="modal-header">
+                <h2>QR Code: ${desk.name}</h2>
+                <button class="modal-close" onclick="document.getElementById('qrModal').remove()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div style="padding: 2rem;">
+                <img src="${qrImageUrl}" alt="QR Code" style="max-width: 200px; border-radius: 8px; background: white; padding: 10px;">
+                <p style="margin-top: 1rem; color: var(--text-secondary); font-size: 0.9rem;">
+                    Scan this QR code at the desk to check in
+                </p>
+                <p style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-muted); word-break: break-all;">
+                    ${qrUrl}
+                </p>
+                <button class="btn btn-primary" style="margin-top: 1rem;" onclick="window.open('${qrImageUrl}', '_blank')">
+                    Download QR Code
+                </button>
+            </div>
+        </div>
+    `;
+    
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.remove();
+    });
+    
+    document.body.appendChild(modal);
+}
+
+// ============================================
 // Initialize Application
 // ============================================
 
 document.addEventListener('DOMContentLoaded', init);
+
 

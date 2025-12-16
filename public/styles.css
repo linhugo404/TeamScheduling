@@ -1762,6 +1762,33 @@ form {
     transform: scale(0.95);
 }
 
+.booking-chip.updating {
+    pointer-events: none;
+    position: relative;
+}
+
+.booking-chip.updating::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 12px;
+    height: 12px;
+    margin: -6px 0 0 -6px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: chip-spin 0.6s linear infinite;
+}
+
+.booking-chip.updating > span {
+    opacity: 0.5;
+}
+
+@keyframes chip-spin {
+    to { transform: rotate(360deg); }
+}
+
 .calendar-day.drag-over {
     background: rgba(217, 92, 2, 0.15) !important;
     border: 2px dashed var(--accent-primary) !important;
@@ -2449,38 +2476,203 @@ form {
     font-weight: 500;
 }
 
-/* Selected Desk Panel (bottom bar like reference) */
+/* Selected Desk Panel - Hidden (using new popup flow) */
 .selected-desk-panel {
+    display: none !important;
+}
+
+/* Desk Info Popup */
+.desk-info-popup {
     position: fixed;
-    bottom: 0;
+    top: 0;
     left: 0;
     right: 0;
-    background: var(--bg-card);
-    border-top: 1px solid var(--border-color);
-    padding: var(--spacing-md) var(--spacing-xl);
-    display: flex;
-    justify-content: center;
-    z-index: 100;
-}
-
-.selected-desk-header {
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
     display: flex;
     align-items: center;
-    gap: var(--spacing-xl);
-    max-width: 600px;
-    width: 100%;
+    justify-content: center;
+    z-index: 1000;
+    animation: fadeIn 0.15s ease;
 }
 
-.selected-desk-header span {
-    flex: 1;
-    font-size: 1.1rem;
-    font-weight: 600;
-    text-align: center;
-    color: var(--text-primary);
-    padding: var(--spacing-sm) var(--spacing-lg);
+.desk-info-popup-content {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    min-width: 280px;
+    max-width: 360px;
+    position: relative;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    animation: slideUp 0.2s ease;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.popup-close {
+    position: absolute;
+    top: var(--spacing-sm);
+    right: var(--spacing-sm);
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    transition: all 0.15s ease;
+}
+
+.popup-close:hover {
     background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.popup-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-md);
+    padding-right: var(--spacing-xl);
+}
+
+.popup-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.popup-status {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 4px 10px;
+    border-radius: 20px;
+}
+
+.popup-status.booked {
+    background: var(--desk-booked-bg);
+    color: var(--desk-booked-border);
+}
+
+.popup-status.available {
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+}
+
+.popup-details {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.popup-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-xs) 0;
+}
+
+.popup-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.popup-value {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.popup-value.checked-in {
+    color: #22c55e;
+}
+
+.popup-actions {
+    margin-top: var(--spacing-md);
+    padding-top: var(--spacing-md);
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* Quick book form */
+.desk-info-popup-content.quick-book {
+    min-width: 300px;
+}
+
+.popup-hint {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: var(--spacing-md);
+    line-height: 1.5;
+}
+
+.quick-book-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.quick-book-form input,
+.quick-book-form select {
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 0.95rem;
+}
+
+.quick-book-form input:focus,
+.quick-book-form select:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(217, 92, 2, 0.15);
+}
+
+.btn-full {
+    width: 100%;
+    margin-top: var(--spacing-xs);
+}
+
+/* Desk booking loading state */
+.floor-desk.booking {
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.floor-desk.booking::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 16px;
+    height: 16px;
+    margin: -8px 0 0 -8px;
+    border: 2px solid var(--border-color);
+    border-top-color: var(--accent-primary);
+    border-radius: 50%;
+    animation: chip-spin 0.6s linear infinite;
+}
 }
 
 /* Chair position selector */

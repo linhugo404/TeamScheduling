@@ -1587,8 +1587,25 @@ async function handleDrop(event, targetDate) {
     // Don't do anything if dropping on the same date
     if (booking.date === targetDate) return;
     
+    // Store original date for potential rollback
+    const originalDate = booking.date;
+    const movedBookingId = draggedBookingId;
+    const teamName = booking.teamName;
+    
+    // Optimistically update the booking's date in local state
+    booking.date = targetDate;
+    
+    // Re-render calendar immediately to show the booking in its new position
+    renderCalendar();
+    
+    // Add loading state to the moved booking chip
+    const movedChip = document.querySelector(`.booking-chip[data-booking-id="${movedBookingId}"]`);
+    if (movedChip) {
+        movedChip.classList.add('updating');
+    }
+    
     try {
-        const response = await fetch(`/api/bookings/${draggedBookingId}`, {
+        const response = await fetch(`/api/bookings/${movedBookingId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ date: targetDate })
@@ -1599,12 +1616,16 @@ async function handleDrop(event, targetDate) {
             throw new Error(error.error);
         }
         
-        showToast(`Moved ${booking.teamName} to ${formatDisplayDate(targetDate)}`, 'success');
+        showToast(`Moved ${teamName} to ${formatDisplayDate(targetDate)}`, 'success');
         
+        // Refresh data to confirm server state
         await loadData();
         renderCalendar();
         
     } catch (error) {
+        // Rollback on error
+        booking.date = originalDate;
+        renderCalendar();
         showToast(error.message || 'Failed to move booking', 'error');
     }
     
@@ -2064,6 +2085,17 @@ function handleDeskClick(deskId) {
         return;
     }
     
+    // Check if desk is already booked
+    const existingBooking = deskState.deskBookings.find(b => b.deskId === deskId);
+    
+    if (existingBooking) {
+        // Desk is booked - show booking info popup
+        showBookingInfoPopup(desk, existingBooking);
+        return;
+    }
+    
+    // Desk is available - try to book it
+    
     // Don't allow booking unavailable desks
     if (desk.deskType === 'unavailable') {
         showToast('This desk is unavailable', 'error');
@@ -2080,13 +2112,214 @@ function handleDeskClick(deskId) {
         }
     }
     
-    // Select desk and show bottom panel
-    deskState.selectedElement = desk;
-    document.getElementById('selectedDeskName').textContent = desk.name;
-    document.getElementById('selectedDeskPanel').style.display = 'flex';
+    // Check if user has saved their info
+    const savedName = localStorage.getItem('employeeName');
     
-    // Highlight selected desk
-    renderFloorMap();
+    if (savedName) {
+        // Quick book with saved info
+        quickBookDesk(desk);
+    } else {
+        // First time - show quick setup modal
+        showQuickBookModal(desk);
+    }
+}
+
+// Show booking info popup for booked desks
+function showBookingInfoPopup(desk, booking) {
+    const location = state.locations.find(l => l.id === desk.locationId);
+    const team = booking.teamId ? state.teams.find(t => t.id === booking.teamId) : null;
+    const savedName = localStorage.getItem('employeeName');
+    const isOwnBooking = savedName && booking.employeeName.toLowerCase() === savedName.toLowerCase();
+    
+    const popup = document.createElement('div');
+    popup.className = 'desk-info-popup';
+    popup.innerHTML = `
+        <div class="desk-info-popup-content">
+            <button class="popup-close" onclick="this.closest('.desk-info-popup').remove()">×</button>
+            <div class="popup-header">
+                <h3>${desk.name}</h3>
+                <span class="popup-status booked">Booked</span>
+            </div>
+            <div class="popup-details">
+                <div class="popup-row">
+                    <span class="popup-label">Booked by</span>
+                    <span class="popup-value">${booking.employeeName}</span>
+                </div>
+                ${team ? `
+                <div class="popup-row">
+                    <span class="popup-label">Team</span>
+                    <span class="popup-value" style="color: ${team.color}">${team.name}</span>
+                </div>
+                ` : ''}
+                <div class="popup-row">
+                    <span class="popup-label">Date</span>
+                    <span class="popup-value">${new Date(deskState.selectedDate).toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+                </div>
+                ${booking.checkedIn ? `
+                <div class="popup-row">
+                    <span class="popup-label">Status</span>
+                    <span class="popup-value checked-in">✓ Checked In</span>
+                </div>
+                ` : ''}
+            </div>
+            ${isOwnBooking ? `
+            <div class="popup-actions">
+                <button class="btn btn-danger btn-small" onclick="cancelBookingFromPopup('${booking.id}', '${desk.id}')">Cancel Booking</button>
+            </div>
+            ` : ''}
+        </div>
+    `;
+    
+    // Remove any existing popups
+    document.querySelectorAll('.desk-info-popup').forEach(p => p.remove());
+    
+    document.body.appendChild(popup);
+    
+    // Close on click outside
+    popup.addEventListener('click', (e) => {
+        if (e.target === popup) popup.remove();
+    });
+    
+    // Close on escape
+    const handleEsc = (e) => {
+        if (e.key === 'Escape') {
+            popup.remove();
+            document.removeEventListener('keydown', handleEsc);
+        }
+    };
+    document.addEventListener('keydown', handleEsc);
+}
+
+// Quick book a desk with saved info
+async function quickBookDesk(desk) {
+    const savedName = localStorage.getItem('employeeName');
+    const savedEmail = localStorage.getItem('employeeEmail') || '';
+    const savedTeamId = localStorage.getItem('employeeTeamId') || null;
+    
+    // Show loading state on desk
+    const deskEl = document.getElementById(`desk-${desk.id}`);
+    if (deskEl) deskEl.classList.add('booking');
+    
+    try {
+        const response = await fetch('/api/desk-bookings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                deskId: desk.id,
+                date: deskState.selectedDate,
+                employeeName: savedName,
+                employeeEmail: savedEmail,
+                teamId: savedTeamId
+            })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error);
+        }
+        
+        showToast(`${desk.name} booked for the day!`, 'success');
+        
+        // Reload bookings
+        const bookingsResponse = await fetch(`/api/desk-bookings?locationId=${state.currentLocation}&date=${deskState.selectedDate}`);
+        deskState.deskBookings = await bookingsResponse.json();
+        renderFloorMap();
+        
+    } catch (error) {
+        showToast(error.message || 'Failed to book desk', 'error');
+        if (deskEl) deskEl.classList.remove('booking');
+    }
+}
+
+// Show quick book modal for first-time users
+function showQuickBookModal(desk) {
+    const savedTeamId = localStorage.getItem('employeeTeamId');
+    
+    const popup = document.createElement('div');
+    popup.className = 'desk-info-popup';
+    popup.innerHTML = `
+        <div class="desk-info-popup-content quick-book">
+            <button class="popup-close" onclick="this.closest('.desk-info-popup').remove()">×</button>
+            <div class="popup-header">
+                <h3>Book ${desk.name}</h3>
+            </div>
+            <p class="popup-hint">Enter your name to book this desk. Your info will be saved for quick booking next time.</p>
+            <form id="quickBookForm" class="quick-book-form">
+                <input type="hidden" id="quickBookDeskId" value="${desk.id}">
+                <div class="form-group">
+                    <input type="text" id="quickBookName" required placeholder="Your name" autofocus>
+                </div>
+                <div class="form-group">
+                    <select id="quickBookTeam">
+                        <option value="">Team (optional)</option>
+                        ${state.teams.map(team => 
+                            `<option value="${team.id}" ${team.id === savedTeamId ? 'selected' : ''} style="color: ${team.color}">${team.name}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary btn-full">Book Desk</button>
+            </form>
+        </div>
+    `;
+    
+    // Remove any existing popups
+    document.querySelectorAll('.desk-info-popup').forEach(p => p.remove());
+    
+    document.body.appendChild(popup);
+    
+    // Focus input
+    setTimeout(() => document.getElementById('quickBookName')?.focus(), 100);
+    
+    // Handle form submit
+    document.getElementById('quickBookForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const name = document.getElementById('quickBookName').value.trim();
+        const teamId = document.getElementById('quickBookTeam').value || null;
+        
+        if (!name) return;
+        
+        // Save to localStorage
+        localStorage.setItem('employeeName', name);
+        if (teamId) localStorage.setItem('employeeTeamId', teamId);
+        
+        popup.remove();
+        await quickBookDesk(desk);
+    });
+    
+    // Close on click outside
+    popup.addEventListener('click', (e) => {
+        if (e.target === popup) popup.remove();
+    });
+    
+    // Close on escape
+    const handleEsc = (e) => {
+        if (e.key === 'Escape') {
+            popup.remove();
+            document.removeEventListener('keydown', handleEsc);
+        }
+    };
+    document.addEventListener('keydown', handleEsc);
+}
+
+// Cancel booking from popup
+async function cancelBookingFromPopup(bookingId, deskId) {
+    if (!confirm('Cancel this booking?')) return;
+    
+    try {
+        await fetch(`/api/desk-bookings/${bookingId}`, { method: 'DELETE' });
+        showToast('Booking cancelled', 'success');
+        
+        // Close popup
+        document.querySelectorAll('.desk-info-popup').forEach(p => p.remove());
+        
+        // Reload
+        const bookingsResponse = await fetch(`/api/desk-bookings?locationId=${state.currentLocation}&date=${deskState.selectedDate}`);
+        deskState.deskBookings = await bookingsResponse.json();
+        renderFloorMap();
+        
+    } catch (error) {
+        showToast('Failed to cancel booking', 'error');
+    }
 }
 
 function selectElement(elementId, elementType) {

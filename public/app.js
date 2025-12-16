@@ -410,9 +410,9 @@ function renderCalendar() {
                          data-booking-id="${booking.id}"
                          data-team-id="${teamId}"
                          style="background: ${color};"
-                         ondragstart="handleDragStart(event, '${booking.id}')"
+                         ondragstart="handleDragStart(event, this.dataset.bookingId)"
                          ondragend="handleDragEnd(event)"
-                         onmouseenter="showTeamTooltip(event, '${teamId}')"
+                         onmouseenter="showTeamTooltip(event, this.dataset.teamId)"
                          onmouseleave="hideTeamTooltip()">
                         <span>${displayName}</span>
                         <span style="opacity: 0.8">(${displayCount})</span>
@@ -834,8 +834,8 @@ function renderTeamsList() {
                         </div>
                     </div>
                     <div class="team-card-actions">
-                        <button class="btn btn-small btn-secondary" onclick="editTeam('${team.id}')">Edit</button>
-                        <button class="btn btn-small btn-danger" onclick="deleteTeam('${team.id}')">Delete</button>
+                        <button class="btn btn-small btn-secondary" data-team-id="${team.id}" onclick="editTeam(this.dataset.teamId)">Edit</button>
+                        <button class="btn btn-small btn-danger" data-team-id="${team.id}" onclick="deleteTeam(this.dataset.teamId)">Delete</button>
                     </div>
                 </div>
             `;
@@ -918,8 +918,8 @@ function renderLocationsList() {
                     </div>
                 </div>
                 <div class="location-card-actions">
-                    <button class="btn btn-small btn-secondary" onclick="editLocation('${loc.id}')">Edit</button>
-                    <button class="btn btn-small btn-danger" onclick="deleteLocation('${loc.id}')">Delete</button>
+                    <button class="btn btn-small btn-secondary" data-loc-id="${loc.id}" onclick="editLocation(this.dataset.locId)">Edit</button>
+                    <button class="btn btn-small btn-danger" data-loc-id="${loc.id}" onclick="deleteLocation(this.dataset.locId)">Delete</button>
                 </div>
             </div>
         `;
@@ -1083,7 +1083,10 @@ async function handleTeamSubmit(e) {
 
 function editTeam(id) {
     const team = state.teams.find(t => t.id === id);
-    if (!team) return;
+    if (!team) {
+        showToast('Team not found. Please refresh the page.', 'error');
+        return;
+    }
     
     renderTeamLocationSelect();
     

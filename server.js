@@ -467,7 +467,7 @@ app.post('/api/locations', async (req, res) => {
         const { name, address, capacity } = req.body;
         
         const newLocation = {
-            id: name.toLowerCase().replace(/\s+/g, '-'),
+            id: name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
             name,
             address: address || '',
             capacity: parseInt(capacity) || 21
@@ -629,7 +629,7 @@ app.post('/api/teams', async (req, res) => {
         }
         
         const newTeam = {
-            id: name.toLowerCase().replace(/\s+/g, '-'),
+            id: name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
             name,
             manager: manager || '',
             manager_image: managerImage || '',

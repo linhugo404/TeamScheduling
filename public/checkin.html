@@ -247,12 +247,11 @@
                 html += '<h3 style="margin: 1rem 0 0.5rem; font-size: 0.9rem; color: #a8b5c4;">Today\'s Bookings</h3>';
                 
                 todayBookings.forEach(booking => {
-                    const isActive = currentTime >= booking.startTime && currentTime < booking.endTime;
-                    const canCheckIn = isActive && !booking.checkedIn;
+                    const canCheckIn = !booking.checkedIn;
                     
                     html += `
-                        <div class="booking-card ${isActive ? 'active' : ''}">
-                            <div class="booking-time">${booking.startTime} - ${booking.endTime}</div>
+                        <div class="booking-card active">
+                            <div class="booking-time">Full Day</div>
                             <div class="booking-person">${booking.employeeName}</div>
                             ${booking.checkedIn 
                                 ? '<span class="booking-status status-checked-in">✓ Checked In</span>'

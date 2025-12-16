@@ -269,6 +269,7 @@ function setupEventListeners() {
         
         // Reload desks if desks view is active
         if (document.getElementById('desksView').classList.contains('active')) {
+            updateFloorSelector();
             loadDesks();
         }
     });
@@ -915,6 +916,14 @@ function renderLocationsList() {
                             </svg>
                             ${loc.capacity} capacity
                         </span>
+                        <span class="location-meta-item">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                <line x1="3" y1="9" x2="21" y2="9"></line>
+                                <line x1="3" y1="15" x2="21" y2="15"></line>
+                            </svg>
+                            ${loc.floors || 1} floor${(loc.floors || 1) > 1 ? 's' : ''}
+                        </span>
                     </div>
                 </div>
                 <div class="location-card-actions">
@@ -1110,6 +1119,7 @@ async function handleLocationSubmit(e) {
     const name = document.getElementById('locationName').value;
     const address = document.getElementById('locationAddress').value;
     const capacity = parseInt(document.getElementById('locationCapacity').value);
+    const floors = parseInt(document.getElementById('locationFloors').value) || 1;
     
     try {
         let response;
@@ -1119,14 +1129,14 @@ async function handleLocationSubmit(e) {
             response = await fetch(`/api/locations/${editLocationId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, address, capacity })
+                body: JSON.stringify({ name, address, capacity, floors })
             });
         } else {
             // Create new location
             response = await fetch('/api/locations', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, address, capacity })
+                body: JSON.stringify({ name, address, capacity, floors })
             });
         }
         
@@ -1157,6 +1167,7 @@ function editLocation(id) {
     document.getElementById('locationName').value = location.name;
     document.getElementById('locationAddress').value = location.address || '';
     document.getElementById('locationCapacity').value = location.capacity;
+    document.getElementById('locationFloors').value = location.floors || 1;
     document.getElementById('locationFormSubmitBtn').textContent = 'Save Changes';
     document.getElementById('locationModalTitle').textContent = 'Edit Location';
     
@@ -1629,9 +1640,7 @@ let deskState = {
     deskBookings: [],
     floorElements: [],
     selectedDate: formatDateStr(new Date()),
-    selectedSlots: [],
     editMode: false,
-    previewTime: '08:00',
     currentFloor: '1',
     selectedElement: null,
     activeTool: null,
@@ -1669,12 +1678,14 @@ function initDesksView() {
     const deskForm = document.getElementById('deskForm');
     const deskBookingForm = document.getElementById('deskBookingForm');
     const toggleEditBtn = document.getElementById('toggleEditMode');
-    const timeSlider = document.getElementById('timePreviewSlider');
     const floorSelect = document.getElementById('floorSelect');
     const deskTypeSelect = document.getElementById('deskType');
     
     // Set default date to today
     dateSelect.value = deskState.selectedDate;
+    
+    // Update floor selector based on current location
+    updateFloorSelector();
     
     // Only add event listeners once
     if (!desksViewInitialized) {
@@ -1692,15 +1703,6 @@ function initDesksView() {
         deskBookingForm.addEventListener('submit', handleDeskBookingSubmit);
         
         toggleEditBtn.addEventListener('click', toggleEditMode);
-        
-        timeSlider.addEventListener('input', (e) => {
-            const slotIndex = parseInt(e.target.value);
-            const hours = Math.floor(slotIndex / 2);
-            const mins = (slotIndex % 2) * 30;
-            deskState.previewTime = `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
-            document.getElementById('timePreviewLabel').textContent = deskState.previewTime;
-            renderFloorMap();
-        });
         
         // Desk type change handler
         deskTypeSelect.addEventListener('change', (e) => {
@@ -1749,14 +1751,30 @@ function initDesksView() {
         ).join('');
     }
     
-    // Set initial time slider to current time
-    const now = new Date();
-    const currentSlotIndex = now.getHours() * 2 + (now.getMinutes() >= 30 ? 1 : 0);
-    timeSlider.value = currentSlotIndex;
-    deskState.previewTime = `${String(now.getHours()).padStart(2, '0')}:${now.getMinutes() >= 30 ? '30' : '00'}`;
-    document.getElementById('timePreviewLabel').textContent = deskState.previewTime;
-    
     loadDesks();
+}
+
+// Update floor selector based on current location's floor count
+function updateFloorSelector() {
+    const floorSelect = document.getElementById('floorSelect');
+    const currentLocation = state.locations.find(l => l.id === state.currentLocation);
+    const floorCount = currentLocation?.floors || 1;
+    
+    // Populate floor options
+    floorSelect.innerHTML = '';
+    for (let i = 1; i <= floorCount; i++) {
+        const suffix = i === 1 ? 'st' : i === 2 ? 'nd' : i === 3 ? 'rd' : 'th';
+        floorSelect.innerHTML += `<option value="${i}">${i}${suffix} Floor</option>`;
+    }
+    
+    // Reset to floor 1 if current floor is beyond the location's floors
+    if (parseInt(deskState.currentFloor) > floorCount) {
+        deskState.currentFloor = '1';
+    }
+    floorSelect.value = deskState.currentFloor;
+    
+    // Show/hide floor selector based on floor count
+    floorSelect.style.display = floorCount > 1 ? 'block' : 'none';
 }
 
 function toggleEditMode() {
@@ -1878,12 +1896,8 @@ function renderFloorMap() {
     
     // Render desks with chairs
     html += deskState.desks.map(desk => {
-        // Find if desk is booked at the preview time
-        const booking = deskState.deskBookings.find(b => 
-            b.deskId === desk.id && 
-            b.startTime <= deskState.previewTime && 
-            b.endTime > deskState.previewTime
-        );
+        // Find if desk is booked for the day
+        const booking = deskState.deskBookings.find(b => b.deskId === desk.id);
         
         const isOccupied = !!booking;
         const isMyBooking = booking && booking.employeeName.toLowerCase() === myName.toLowerCase();
@@ -1937,7 +1951,7 @@ function renderFloorMap() {
                  style="${styleStr}"
                  data-desk-id="${desk.id}"
                  onclick="handleDeskClick('${desk.id}')"
-                 title="${isOccupied ? `${booking.employeeName}${teamName ? ' (' + teamName + ')' : ''}\n${booking.startTime} - ${booking.endTime}` : isUnavailable ? 'Unavailable' : isTeamSeat ? `Team: ${teamName}` : 'Click to book'}">
+                 title="${isOccupied ? `${booking.employeeName}${teamName ? ' (' + teamName + ')' : ''} - Full Day` : isUnavailable ? 'Unavailable' : isTeamSeat ? `Team: ${teamName}` : 'Click to book'}">
                 ${chairsHtml}
                 <div class="desk-label">${desk.name}</div>
                 ${isOccupied ? `<div class="desk-occupant">${booking.employeeName}</div>` : ''}
@@ -1957,7 +1971,54 @@ function renderFloorMap() {
         setupDeskDragging();
         setupElementDragging();
     }
+    
+    // Scale the floor map to fit the container (use requestAnimationFrame for accurate measurements)
+    requestAnimationFrame(() => scaleFloorMap());
 }
+
+// Scale floor map to fit within its container while maintaining aspect ratio
+function scaleFloorMap() {
+    const floorMap = document.getElementById('floorMap');
+    const container = document.querySelector('.floor-map-container');
+    
+    if (!floorMap || !container) return;
+    
+    // Known natural size of the floor map
+    const mapWidth = 1200;
+    const mapHeight = 800;
+    
+    // Disable transition temporarily to prevent visual glitch
+    floorMap.style.transition = 'none';
+    
+    // Get available container size
+    const containerRect = container.getBoundingClientRect();
+    const availableWidth = containerRect.width - 20; // Small padding
+    const availableHeight = containerRect.height - 20;
+    
+    // Calculate scale to fit both dimensions
+    const scaleX = availableWidth / mapWidth;
+    const scaleY = availableHeight / mapHeight;
+    const scale = Math.min(scaleX, scaleY, 1); // Don't scale up, only down
+    
+    // Apply the scale
+    floorMap.style.transform = `scale(${scale})`;
+    
+    // Re-enable transition after a frame
+    requestAnimationFrame(() => {
+        floorMap.style.transition = '';
+    });
+}
+
+// Add resize listener for floor map scaling (debounced)
+let resizeTimeout;
+window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+        if (document.getElementById('desksView')?.classList.contains('active')) {
+            scaleFloorMap();
+        }
+    }, 100);
+});
 
 function handleDeskClick(deskId) {
     const desk = deskState.desks.find(d => d.id === deskId);
@@ -2653,19 +2714,16 @@ async function handleLabelSubmit(e) {
     }
 }
 
-// Generate time options for dropdowns (00:00 - 23:30 in 30-min increments)
-function generateTimeOptions() {
-    const times = [];
-    for (let hour = 0; hour < 24; hour++) {
-        times.push(`${String(hour).padStart(2, '0')}:00`);
-        times.push(`${String(hour).padStart(2, '0')}:30`);
-    }
-    return times;
-}
-
 function openDeskBookingModal(deskId) {
     const desk = deskState.desks.find(d => d.id === deskId);
     if (!desk) return;
+    
+    // Check if desk is already booked for this day
+    const existingBooking = deskState.deskBookings.find(b => b.deskId === deskId);
+    if (existingBooking) {
+        showToast(`This desk is already booked by ${existingBooking.employeeName} for the day`, 'error');
+        return;
+    }
     
     const modal = document.getElementById('deskBookingModal');
     const infoDiv = document.getElementById('deskBookingInfo');
@@ -2692,166 +2750,12 @@ function openDeskBookingModal(deskId) {
         <h3>${desk.name}</h3>
         <p>${location?.name || ''} ${desk.floor ? `• Floor ${desk.floor}` : ''} ${desk.zone ? `• ${desk.zone}` : ''}</p>
         <p class="booking-date">${new Date(deskState.selectedDate).toLocaleDateString('en-ZA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+        <p class="booking-type">Full Day Booking</p>
     `;
     
-    // Initialize time range picker
-    initTimeRangePicker(deskId);
-    renderAvailabilityTimeline(deskId);
     renderDeskBookingsList(deskId);
     
     modal.classList.add('active');
-}
-
-function initTimeRangePicker(deskId) {
-    const startSelect = document.getElementById('startTimeSelect');
-    const endSelect = document.getElementById('endTimeSelect');
-    const times = generateTimeOptions();
-    
-    // Find first available slot
-    const deskBookings = deskState.deskBookings.filter(b => b.deskId === deskId);
-    const bookedTimes = new Set(deskBookings.map(b => b.startTime));
-    
-    // Get current time for today
-    const today = formatDateStr(new Date());
-    const now = new Date();
-    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${now.getMinutes() < 30 ? '00' : '30'}`;
-    
-    // Build start time options (exclude end time 17:00)
-    const startTimes = times.slice(0, -1);
-    startSelect.innerHTML = startTimes.map(time => {
-        const isPast = deskState.selectedDate === today && time < currentTime;
-        const isBooked = bookedTimes.has(time);
-        const disabled = isPast || isBooked;
-        return `<option value="${time}" ${disabled ? 'disabled' : ''}>${time}${isBooked ? ' (booked)' : ''}</option>`;
-    }).join('');
-    
-    // Set default to first available time
-    const firstAvailable = startTimes.find(time => {
-        const isPast = deskState.selectedDate === today && time < currentTime;
-        return !isPast && !bookedTimes.has(time);
-    });
-    if (firstAvailable) startSelect.value = firstAvailable;
-    
-    // Update end time options based on start time
-    updateEndTimeOptions(deskId);
-    
-    // Add change listeners
-    startSelect.onchange = () => {
-        updateEndTimeOptions(deskId);
-        updateTimeRangeSummary();
-    };
-    endSelect.onchange = () => updateTimeRangeSummary();
-    
-    updateTimeRangeSummary();
-}
-
-function updateEndTimeOptions(deskId) {
-    const startSelect = document.getElementById('startTimeSelect');
-    const endSelect = document.getElementById('endTimeSelect');
-    const startTime = startSelect.value;
-    const times = generateTimeOptions();
-    const deskBookings = deskState.deskBookings.filter(b => b.deskId === deskId);
-    
-    // Find the next booked slot after start time
-    const bookedAfterStart = deskBookings
-        .filter(b => b.startTime > startTime)
-        .sort((a, b) => a.startTime.localeCompare(b.startTime));
-    
-    const nextBookedTime = bookedAfterStart.length > 0 ? bookedAfterStart[0].startTime : null;
-    
-    // End times must be after start time and before next booking
-    const startIndex = times.indexOf(startTime);
-    const validEndTimes = times.slice(startIndex + 1).filter(time => {
-        if (nextBookedTime && time > nextBookedTime) return false;
-        return true;
-    });
-    
-    endSelect.innerHTML = validEndTimes.map(time => 
-        `<option value="${time}">${time}</option>`
-    ).join('');
-    
-    // Default to 1 hour later if available, otherwise first option
-    const oneHourLater = addMinutesToTime(startTime, 60);
-    if (validEndTimes.includes(oneHourLater)) {
-        endSelect.value = oneHourLater;
-    }
-}
-
-function addMinutesToTime(time, minutes) {
-    const [h, m] = time.split(':').map(Number);
-    const totalMins = h * 60 + m + minutes;
-    const newH = Math.floor(totalMins / 60);
-    const newM = totalMins % 60;
-    return `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}`;
-}
-
-function updateTimeRangeSummary() {
-    const startTime = document.getElementById('startTimeSelect').value;
-    const endTime = document.getElementById('endTimeSelect').value;
-    const container = document.getElementById('timeRangeSummary');
-    
-    if (!startTime || !endTime) {
-        container.innerHTML = '';
-        return;
-    }
-    
-    // Calculate duration
-    const [startH, startM] = startTime.split(':').map(Number);
-    const [endH, endM] = endTime.split(':').map(Number);
-    const durationMins = (endH * 60 + endM) - (startH * 60 + startM);
-    const hours = Math.floor(durationMins / 60);
-    const mins = durationMins % 60;
-    
-    let durationText = '';
-    if (hours > 0) durationText += `${hours} hour${hours > 1 ? 's' : ''}`;
-    if (mins > 0) durationText += `${hours > 0 ? ' ' : ''}${mins} min`;
-    
-    container.innerHTML = `
-        <div class="summary-badge">
-            <span class="summary-time">${startTime} - ${endTime}</span>
-            <span class="summary-duration">${durationText}</span>
-        </div>
-    `;
-}
-
-function renderAvailabilityTimeline(deskId) {
-    const container = document.getElementById('availabilityTimeline');
-    const deskBookings = deskState.deskBookings.filter(b => b.deskId === deskId);
-    const times = generateTimeOptions().slice(0, -1); // Exclude 17:00 as it's end-only
-    
-    const today = formatDateStr(new Date());
-    const now = new Date();
-    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${now.getMinutes() < 30 ? '00' : '30'}`;
-    
-    container.innerHTML = times.map(time => {
-        const booking = deskBookings.find(b => b.startTime === time);
-        const isPast = deskState.selectedDate === today && time < currentTime;
-        
-        let className = 'timeline-slot';
-        let tooltip = time;
-        
-        if (booking) {
-            className += ' booked';
-            tooltip = `${time} - ${booking.employeeName}`;
-        } else if (isPast) {
-            className += ' past';
-            tooltip = `${time} - Past`;
-        } else {
-            className += ' available';
-            tooltip = `${time} - Available`;
-        }
-        
-        return `<div class="${className}" title="${tooltip}"></div>`;
-    }).join('');
-    
-    // Add legend
-    container.innerHTML += `
-        <div class="timeline-legend">
-            <span><span class="legend-dot available"></span> Available</span>
-            <span><span class="legend-dot booked"></span> Booked</span>
-            <span><span class="legend-dot past"></span> Past</span>
-        </div>
-    `;
 }
 
 function closeDeskBookingModal() {
@@ -2864,16 +2768,9 @@ async function handleDeskBookingSubmit(e) {
     
     const deskId = document.getElementById('bookingDeskId').value;
     const date = document.getElementById('bookingDate').value;
-    const startTime = document.getElementById('startTimeSelect').value;
-    const endTime = document.getElementById('endTimeSelect').value;
     const employeeName = document.getElementById('employeeName').value;
     const employeeEmail = document.getElementById('employeeEmail').value;
     const teamId = document.getElementById('deskBookingTeam').value || null;
-    
-    if (!startTime || !endTime) {
-        showToast('Please select a time range', 'error');
-        return;
-    }
     
     // Save to localStorage for convenience
     localStorage.setItem('employeeName', employeeName);
@@ -2881,48 +2778,31 @@ async function handleDeskBookingSubmit(e) {
     if (teamId) localStorage.setItem('employeeTeamId', teamId);
     
     try {
-        // Generate all 30-min slots between start and end
-        const slots = [];
-        let current = startTime;
-        while (current < endTime) {
-            const next = addMinutesToTime(current, 30);
-            slots.push({ start: current, end: next });
-            current = next;
+        const response = await fetch('/api/desk-bookings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                deskId,
+                date,
+                employeeName,
+                employeeEmail,
+                teamId
+            })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error);
         }
         
-        // Book each slot
-        for (const slot of slots) {
-            const response = await fetch('/api/desk-bookings', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    deskId,
-                    date,
-                    startTime: slot.start,
-                    endTime: slot.end,
-                    employeeName,
-                    employeeEmail,
-                    teamId
-                })
-            });
-            
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error);
-            }
-        }
+        showToast('Desk booked for the day!', 'success');
         
-        showToast(`Booked ${startTime} - ${endTime}`, 'success');
-        
-        // Reload bookings
+        // Reload bookings and close modal
         const bookingsResponse = await fetch(`/api/desk-bookings?locationId=${state.currentLocation}&date=${date}`);
         deskState.deskBookings = await bookingsResponse.json();
         
-        // Refresh the modal
-        initTimeRangePicker(deskId);
-        renderAvailabilityTimeline(deskId);
-        renderDeskBookingsList(deskId);
-        renderDesksGrid();
+        closeDeskBookingModal();
+        renderFloorMap();
         
     } catch (error) {
         showToast(error.message || 'Failed to book desk', 'error');
@@ -2938,106 +2818,16 @@ function renderDeskBookingsList(deskId) {
         return;
     }
     
-    // Group consecutive bookings by the same person into time ranges
-    const groupedBookings = groupConsecutiveBookings(deskBookings);
-    
-    container.innerHTML = groupedBookings.map(group => {
-        const isCheckedIn = group.bookings.some(b => b.checkedIn);
-        const bookingIds = group.bookings.map(b => b.id).join(',');
-        
+    container.innerHTML = deskBookings.map(booking => {
         return `
-            <div class="desk-booking-item ${isCheckedIn ? 'checked-in' : ''}">
-                <div class="booking-time">${group.startTime} - ${group.endTime}</div>
-                <div class="booking-person">${group.employeeName}</div>
-                <div class="booking-duration">${calculateDuration(group.startTime, group.endTime)}</div>
-                ${isCheckedIn ? '<span class="checked-in-badge">Checked In</span>' : ''}
-                <button class="btn btn-small btn-danger" onclick="cancelDeskBookingRange('${bookingIds}', '${deskId}')">Cancel</button>
+            <div class="desk-booking-item ${booking.checkedIn ? 'checked-in' : ''}">
+                <div class="booking-person">${booking.employeeName}</div>
+                <div class="booking-duration">Full Day</div>
+                ${booking.checkedIn ? '<span class="checked-in-badge">Checked In</span>' : ''}
+                <button class="btn btn-small btn-danger" data-booking-id="${booking.id}" data-desk-id="${deskId}" onclick="cancelDeskBooking(this.dataset.bookingId, this.dataset.deskId)">Cancel</button>
             </div>
         `;
     }).join('');
-}
-
-function groupConsecutiveBookings(bookings) {
-    if (bookings.length === 0) return [];
-    
-    // Sort by start time
-    const sorted = [...bookings].sort((a, b) => a.startTime.localeCompare(b.startTime));
-    
-    const groups = [];
-    let currentGroup = {
-        employeeName: sorted[0].employeeName,
-        startTime: sorted[0].startTime,
-        endTime: sorted[0].endTime,
-        bookings: [sorted[0]]
-    };
-    
-    for (let i = 1; i < sorted.length; i++) {
-        const booking = sorted[i];
-        
-        // Check if this booking is consecutive and by the same person
-        if (booking.employeeName === currentGroup.employeeName && 
-            booking.startTime === currentGroup.endTime) {
-            // Extend the current group
-            currentGroup.endTime = booking.endTime;
-            currentGroup.bookings.push(booking);
-        } else {
-            // Start a new group
-            groups.push(currentGroup);
-            currentGroup = {
-                employeeName: booking.employeeName,
-                startTime: booking.startTime,
-                endTime: booking.endTime,
-                bookings: [booking]
-            };
-        }
-    }
-    
-    // Don't forget the last group
-    groups.push(currentGroup);
-    
-    return groups;
-}
-
-function calculateDuration(startTime, endTime) {
-    const [startH, startM] = startTime.split(':').map(Number);
-    const [endH, endM] = endTime.split(':').map(Number);
-    const durationMins = (endH * 60 + endM) - (startH * 60 + startM);
-    const hours = Math.floor(durationMins / 60);
-    const mins = durationMins % 60;
-    
-    let text = '';
-    if (hours > 0) text += `${hours}h`;
-    if (mins > 0) text += `${hours > 0 ? ' ' : ''}${mins}m`;
-    return text || '0m';
-}
-
-async function cancelDeskBookingRange(bookingIds, deskId) {
-    const ids = bookingIds.split(',');
-    const slotCount = ids.length;
-    
-    if (!confirm(`Cancel this booking? (${slotCount} slot${slotCount > 1 ? 's' : ''})`)) return;
-    
-    try {
-        // Cancel all bookings in the range
-        for (const id of ids) {
-            await fetch(`/api/desk-bookings/${id}`, { method: 'DELETE' });
-        }
-        
-        showToast('Booking cancelled', 'success');
-        
-        // Reload
-        const date = deskState.selectedDate;
-        const bookingsResponse = await fetch(`/api/desk-bookings?locationId=${state.currentLocation}&date=${date}`);
-        deskState.deskBookings = await bookingsResponse.json();
-        
-        initTimeRangePicker(deskId);
-        renderAvailabilityTimeline(deskId);
-        renderDeskBookingsList(deskId);
-        renderDesksGrid();
-        
-    } catch (error) {
-        showToast('Failed to cancel booking', 'error');
-    }
 }
 
 async function cancelDeskBooking(bookingId, deskId) {
@@ -3052,10 +2842,9 @@ async function cancelDeskBooking(bookingId, deskId) {
         const bookingsResponse = await fetch(`/api/desk-bookings?locationId=${state.currentLocation}&date=${date}`);
         deskState.deskBookings = await bookingsResponse.json();
         
-        initTimeRangePicker(deskId);
-        renderAvailabilityTimeline(deskId);
         renderDeskBookingsList(deskId);
-        renderDesksGrid();
+        renderFloorMap();
+        closeDeskBookingModal();
         
     } catch (error) {
         showToast('Failed to cancel booking', 'error');

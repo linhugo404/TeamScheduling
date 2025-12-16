@@ -464,13 +464,14 @@ app.delete('/api/bookings/:id', async (req, res) => {
 // Manage locations
 app.post('/api/locations', async (req, res) => {
     try {
-        const { name, address, capacity } = req.body;
+        const { name, address, capacity, floors } = req.body;
         
         const newLocation = {
             id: name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
             name,
             address: address || '',
-            capacity: parseInt(capacity) || 21
+            capacity: parseInt(capacity) || 21,
+            floors: parseInt(floors) || 1
         };
         
         const { data, error } = await supabase
@@ -517,6 +518,7 @@ app.put('/api/locations/:id', async (req, res) => {
         if (updates.name) dbUpdates.name = updates.name;
         if (updates.address !== undefined) dbUpdates.address = updates.address;
         if (updates.capacity) dbUpdates.capacity = parseInt(updates.capacity);
+        if (updates.floors) dbUpdates.floors = parseInt(updates.floors);
         if (updates.floorPlanWidth) dbUpdates.floor_plan_width = parseInt(updates.floorPlanWidth);
         if (updates.floorPlanHeight) dbUpdates.floor_plan_height = parseInt(updates.floorPlanHeight);
         
@@ -959,12 +961,12 @@ app.get('/api/desk-bookings', async (req, res) => {
     }
 });
 
-// Create a desk booking (30-min slot)
+// Create a desk booking (full day)
 app.post('/api/desk-bookings', async (req, res) => {
     try {
-        const { deskId, date, startTime, endTime, employeeName, employeeEmail, teamId } = req.body;
+        const { deskId, date, employeeName, employeeEmail, teamId } = req.body;
         
-        if (!deskId || !date || !startTime || !endTime || !employeeName) {
+        if (!deskId || !date || !employeeName) {
             return res.status(400).json({ error: 'Missing required fields' });
         }
         
@@ -979,16 +981,15 @@ app.post('/api/desk-bookings', async (req, res) => {
             return res.status(400).json({ error: 'Desk not found' });
         }
         
-        // Check for conflicts
+        // Check if desk is already booked for this day
         const { data: conflicts } = await supabase
             .from('desk_bookings')
             .select('id')
             .eq('desk_id', deskId)
-            .eq('date', date)
-            .or(`and(start_time.lt.${endTime},end_time.gt.${startTime})`);
+            .eq('date', date);
         
         if (conflicts && conflicts.length > 0) {
-            return res.status(400).json({ error: 'Time slot already booked' });
+            return res.status(400).json({ error: 'Desk already booked for this day' });
         }
         
         const newBooking = {
@@ -997,8 +998,6 @@ app.post('/api/desk-bookings', async (req, res) => {
             desk_name: desk.name,
             location_id: desk.location_id,
             date,
-            start_time: startTime,
-            end_time: endTime,
             employee_name: employeeName,
             employee_email: employeeEmail || '',
             team_id: teamId || null,

@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS locations (
     name TEXT NOT NULL,
     address TEXT DEFAULT '',
     capacity INTEGER DEFAULT 21,
+    floors INTEGER DEFAULT 1,  -- Number of floors at this location
     floor_plan_width INTEGER,
     floor_plan_height INTEGER,
     created_at TIMESTAMPTZ DEFAULT NOW()
@@ -82,14 +83,15 @@ CREATE INDEX IF NOT EXISTS idx_desks_location ON desks(location_id);
 -- ============================================
 -- DESK BOOKINGS TABLE
 -- ============================================
+-- Note: start_time and end_time are now optional (full-day bookings by default)
 CREATE TABLE IF NOT EXISTS desk_bookings (
     id TEXT PRIMARY KEY,
     desk_id TEXT REFERENCES desks(id) ON DELETE CASCADE,
     desk_name TEXT NOT NULL,
     location_id TEXT REFERENCES locations(id) ON DELETE CASCADE,
     date DATE NOT NULL,
-    start_time TIME NOT NULL,
-    end_time TIME NOT NULL,
+    start_time TIME, -- Optional: NULL means full-day booking
+    end_time TIME,   -- Optional: NULL means full-day booking
     employee_name TEXT NOT NULL,
     employee_email TEXT DEFAULT '',
     team_id TEXT REFERENCES teams(id) ON DELETE SET NULL,

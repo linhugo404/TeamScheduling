@@ -201,11 +201,6 @@
                             <option value="3">3rd Floor</option>
                         </select>
                         <input type="date" id="deskDateSelect" class="date-select">
-                        <div class="time-preview-control">
-                            <label for="timePreviewSlider">Time:</label>
-                            <input type="range" id="timePreviewSlider" min="0" max="47" value="16" class="time-slider">
-                            <span id="timePreviewLabel" class="time-preview-label">08:00</span>
-                        </div>
                         <button id="toggleEditMode" class="btn btn-secondary">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -449,6 +444,11 @@
                     <label for="locationCapacity">Daily Capacity (max people per day)</label>
                     <input type="number" id="locationCapacity" min="1" value="21" required>
                 </div>
+                <div class="form-group">
+                    <label for="locationFloors">Number of Floors</label>
+                    <input type="number" id="locationFloors" min="1" max="50" value="1" required>
+                    <span class="hint">How many floors does this location have?</span>
+                </div>
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" onclick="closeLocationModal()">Cancel</button>
                     <button type="submit" class="btn btn-primary" id="locationFormSubmitBtn">Add Location</button>
@@ -630,33 +630,6 @@
                             <option value="">-- No team --</option>
                             <!-- Populated dynamically -->
                         </select>
-                    </div>
-                    
-                    <div class="time-range-picker">
-                        <h3>Select Time Range</h3>
-                        <div class="time-range-inputs">
-                            <div class="time-input-group">
-                                <label for="startTimeSelect">From</label>
-                                <select id="startTimeSelect" class="time-select" required>
-                                    <!-- Populated by JS -->
-                                </select>
-                            </div>
-                            <span class="time-range-separator">→</span>
-                            <div class="time-input-group">
-                                <label for="endTimeSelect">To</label>
-                                <select id="endTimeSelect" class="time-select" required>
-                                    <!-- Populated by JS -->
-                                </select>
-                            </div>
-                        </div>
-                        <div id="timeRangeSummary" class="time-range-summary"></div>
-                    </div>
-                    
-                    <div class="existing-bookings-preview">
-                        <h4>Availability</h4>
-                        <div id="availabilityTimeline" class="availability-timeline">
-                            <!-- Visual timeline populated by JS -->
-                        </div>
                     </div>
                     
                     <div class="form-actions">

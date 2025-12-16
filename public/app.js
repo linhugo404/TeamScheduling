@@ -298,6 +298,33 @@ function setupEventListeners() {
     
     // Theme toggle
     document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+    document.getElementById('mobileThemeToggle')?.addEventListener('click', toggleTheme);
+    
+    // Mobile menu
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    const mobileOverlay = document.getElementById('mobileOverlay');
+    const sidebar = document.getElementById('sidebar');
+    
+    mobileMenuBtn?.addEventListener('click', () => {
+        sidebar?.classList.toggle('open');
+        mobileOverlay?.classList.toggle('active');
+        document.body.classList.toggle('menu-open');
+    });
+    
+    mobileOverlay?.addEventListener('click', () => {
+        sidebar?.classList.remove('open');
+        mobileOverlay?.classList.remove('active');
+        document.body.classList.remove('menu-open');
+    });
+    
+    // Close mobile menu when navigating
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', () => {
+            sidebar?.classList.remove('open');
+            mobileOverlay?.classList.remove('active');
+            document.body.classList.remove('menu-open');
+        });
+    });
     
     // Close modals on outside click
     [elements.bookingModal, elements.teamModal, elements.locationModal].forEach(modal => {
@@ -432,7 +459,8 @@ function renderCalendar() {
             ondragleave="handleDragLeave(event)"
             ondrop="handleDrop(event, '${dateStr}')"
         ` : '';
-        html += `<div class="${classes.join(' ')}" ${clickHandler} ${dropHandlers} data-date="${dateStr}">${dayContent}</div>`;
+        const bookingCount = dayBookings.length;
+        html += `<div class="${classes.join(' ')}" ${clickHandler} ${dropHandlers} data-date="${dateStr}" data-booking-count="${bookingCount}">${dayContent}</div>`;
     }
     
     // Next month days
@@ -2051,13 +2079,33 @@ function scaleFloorMap() {
     const availableWidth = containerRect.width - 20; // Small padding
     const availableHeight = containerRect.height - 20;
     
+    // Skip if container has no size yet
+    if (availableWidth <= 0 || availableHeight <= 0) {
+        requestAnimationFrame(() => scaleFloorMap());
+        return;
+    }
+    
     // Calculate scale to fit both dimensions
     const scaleX = availableWidth / mapWidth;
     const scaleY = availableHeight / mapHeight;
     const scale = Math.min(scaleX, scaleY, 1); // Don't scale up, only down
     
-    // Apply the scale
-    floorMap.style.transform = `scale(${scale})`;
+    // Check if we're on mobile (using media query match)
+    const isMobile = window.matchMedia('(max-width: 768px)').matches;
+    
+    // On mobile, use top-left origin for better fit
+    if (isMobile) {
+        floorMap.style.transformOrigin = 'top left';
+        // Center the scaled map
+        const scaledWidth = mapWidth * scale;
+        const scaledHeight = mapHeight * scale;
+        const offsetX = Math.max(0, (containerRect.width - scaledWidth) / 2);
+        const offsetY = Math.max(0, (containerRect.height - scaledHeight) / 2);
+        floorMap.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+    } else {
+        floorMap.style.transformOrigin = 'center center';
+        floorMap.style.transform = `scale(${scale})`;
+    }
     
     // Re-enable transition after a frame
     requestAnimationFrame(() => {

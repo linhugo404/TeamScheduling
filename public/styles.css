@@ -1856,6 +1856,78 @@ form {
 }
 
 /* ============================================
+   Mobile Header (hidden on desktop)
+   ============================================ */
+.mobile-header {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    padding: 0 var(--spacing-md);
+    align-items: center;
+    justify-content: space-between;
+    z-index: 200;
+}
+
+.mobile-menu-btn {
+    background: none;
+    border: none;
+    padding: var(--spacing-sm);
+    color: var(--text-primary);
+    cursor: pointer;
+    border-radius: var(--radius-md);
+    transition: background 0.15s ease;
+}
+
+.mobile-menu-btn:hover {
+    background: var(--bg-tertiary);
+}
+
+.mobile-menu-btn svg {
+    width: 24px;
+    height: 24px;
+}
+
+.mobile-logo {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    color: var(--text-primary);
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.mobile-logo svg {
+    width: 24px;
+    height: 24px;
+    color: var(--accent-primary);
+}
+
+.mobile-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    z-index: 150;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.mobile-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* ============================================
    Responsive Design
    ============================================ */
 @media (max-width: 1024px) {
@@ -1891,28 +1963,359 @@ form {
     }
 }
 
+/* ============================================
+   Mobile Styles (768px and below)
+   ============================================ */
 @media (max-width: 768px) {
-    .sidebar {
-        display: none;
+    /* Show mobile header */
+    .mobile-header {
+        display: flex;
     }
     
-    .main-content {
-        margin-left: 0;
+    .mobile-overlay {
+        display: block;
+    }
+    
+    /* Sidebar becomes slide-out drawer */
+    .sidebar {
+        display: flex;
+        position: fixed;
+        left: -280px;
+        top: 0;
+        width: 280px;
+        height: 100vh;
+        z-index: 160;
+        transition: left 0.3s ease;
+        padding: var(--spacing-lg);
+    }
+    
+    .sidebar.open {
+        left: 0;
+    }
+    
+    .sidebar .logo span,
+    .sidebar .location-selector label,
+    .sidebar .capacity-header span:first-child,
+    .sidebar .nav-item span,
+    .sidebar .teams-legend {
+        display: block;
+    }
+    
+    .sidebar .logo {
+        justify-content: flex-start;
+    }
+    
+    .sidebar .nav-item {
+        justify-content: flex-start;
         padding: var(--spacing-md);
     }
     
+    /* Main content adjustments */
+    .main-content {
+        margin-left: 0;
+        padding: var(--spacing-md);
+        padding-top: calc(60px + var(--spacing-md));
+        min-height: 100vh;
+        max-height: none;
+        overflow-y: visible;
+    }
+    
+    body.menu-open {
+        overflow: hidden;
+    }
+    
+    /* View headers */
+    .view-header {
+        flex-direction: column;
+        gap: var(--spacing-md);
+        align-items: stretch;
+    }
+    
+    .view-header h1 {
+        font-size: 1.5rem;
+    }
+    
+    /* Calendar responsive */
+    .calendar-header {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+    }
+    
+    .calendar-nav {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    .calendar-container {
+        overflow-x: auto;
+    }
+    
+    .calendar-grid {
+        min-width: 100%;
+    }
+    
     .calendar-day {
-        min-height: 80px;
+        min-height: 60px;
         padding: var(--spacing-xs);
+    }
+    
+    .day-number {
+        font-size: 0.8rem;
+    }
+    
+    .day-capacity {
+        font-size: 0.6rem;
+        padding: 2px 4px;
     }
     
     .day-bookings-preview {
         display: none;
     }
     
-    .view-header {
+    /* Show compact booking indicators on mobile */
+    .calendar-day:not(.other-month):not(.weekend):not(.holiday)::after {
+        content: attr(data-booking-count);
+        position: absolute;
+        bottom: 4px;
+        right: 4px;
+        font-size: 0.6rem;
+        background: var(--accent-primary);
+        color: white;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+    }
+    
+    .calendar-day[data-booking-count]:not([data-booking-count="0"])::after {
+        opacity: 1;
+    }
+    
+    /* Teams grid */
+    .teams-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .team-card {
+        padding: var(--spacing-md);
+    }
+    
+    /* Locations list */
+    .locations-list {
+        gap: var(--spacing-md);
+    }
+    
+    .location-item {
         flex-direction: column;
         gap: var(--spacing-md);
+    }
+    
+    .location-map {
+        width: 100%;
+        height: 150px;
+    }
+    
+    /* Desk booking system */
+    #desksView.active {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 60px - var(--spacing-md) * 2);
+        overflow: hidden;
+    }
+    
+    #desksView .view-header {
+        flex-shrink: 0;
+    }
+    
+    .desk-header-controls {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--spacing-sm);
+    }
+    
+    .desk-header-controls select,
+    .desk-header-controls input {
+        flex: 1;
+        min-width: 100px;
+    }
+    
+    .desk-header-controls .btn {
+        flex-shrink: 0;
+    }
+    
+    .floor-map-wrapper {
+        flex: 1;
+        min-height: 0;
+        height: auto;
+        overflow: hidden;
+    }
+    
+    .floor-map-container {
+        touch-action: pan-x pan-y pinch-zoom;
+        height: 100%;
+    }
+    
+    .floor-map {
+        transform-origin: top left;
+    }
+    
+    /* Make desks more touch-friendly */
+    .floor-desk {
+        min-width: 50px;
+        min-height: 35px;
+    }
+    
+    /* Floor map legend */
+    .floor-map-legend {
+        flex-wrap: wrap;
+        gap: var(--spacing-xs);
+        padding: var(--spacing-xs) 0;
+        font-size: 0.7rem;
+    }
+    
+    .legend-item {
+        padding: 2px 6px;
+    }
+    
+    /* Edit mode toolbar */
+    .edit-mode-panel {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+        padding: var(--spacing-sm);
+        flex-shrink: 0;
+    }
+    
+    .edit-toolbar {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: var(--spacing-xs);
+    }
+    
+    .toolbar-btn {
+        padding: var(--spacing-xs) var(--spacing-sm);
+        font-size: 0.75rem;
+    }
+    
+    .toolbar-btn svg {
+        width: 16px;
+        height: 16px;
+    }
+    
+    .toolbar-label {
+        display: none;
+    }
+    
+    /* Modals */
+    .modal {
+        padding: var(--spacing-sm);
+        align-items: flex-end;
+    }
+    
+    .modal-content {
+        max-height: 90vh;
+        width: 100%;
+        max-width: 100%;
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        margin-bottom: 0;
+    }
+    
+    .modal-header h2 {
+        font-size: 1.1rem;
+    }
+    
+    /* Form inputs larger for touch */
+    input, select, textarea {
+        font-size: 16px !important; /* Prevents iOS zoom */
+        padding: var(--spacing-md) !important;
+    }
+    
+    .form-group {
+        margin-bottom: var(--spacing-md);
+    }
+    
+    .btn {
+        padding: var(--spacing-md) var(--spacing-lg);
+        font-size: 0.95rem;
+    }
+    
+    /* Holidays list */
+    .holidays-list {
+        gap: var(--spacing-sm);
+    }
+    
+    .holiday-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-xs);
+    }
+    
+    /* Toast notifications */
+    .toast {
+        left: var(--spacing-md);
+        right: var(--spacing-md);
+        bottom: var(--spacing-md);
+        max-width: none;
+    }
+    
+    /* Desk info popup */
+    .desk-info-popup {
+        align-items: flex-end;
+        padding: 0;
+    }
+    
+    .desk-info-popup-content {
+        width: 100%;
+        max-width: 100%;
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        padding-bottom: calc(var(--spacing-lg) + env(safe-area-inset-bottom));
+    }
+    
+    /* Team tooltip */
+    .team-tooltip {
+        display: none !important;
+    }
+}
+
+/* Small phones */
+@media (max-width: 480px) {
+    .mobile-logo span {
+        display: none;
+    }
+    
+    .calendar-weekdays span {
+        font-size: 0.65rem;
+    }
+    
+    .calendar-day {
+        min-height: 50px;
+    }
+    
+    .day-number {
+        font-size: 0.75rem;
+    }
+    
+    .view-header h1 {
+        font-size: 1.25rem;
+    }
+    
+    .btn {
+        padding: var(--spacing-sm) var(--spacing-md);
+        font-size: 0.85rem;
+    }
+    
+    /* Desk controls stacked on small screens */
+    .desk-header-controls {
+        flex-direction: column;
+    }
+    
+    .desk-header-controls select,
+    .desk-header-controls input,
+    .desk-header-controls .btn {
+        width: 100%;
     }
 }
 

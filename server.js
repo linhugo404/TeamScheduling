@@ -1,13 +1,23 @@
 const express = require('express');
 const cors = require('cors');
-const fs = require('fs').promises;
-const path = require('path');
 const http = require('http');
 const { Server } = require('socket.io');
+const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const DATA_FILE = path.join(__dirname, 'data', 'bookings.json');
+
+// Supabase configuration
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+    console.error('❌ Missing Supabase configuration!');
+    console.error('Please set SUPABASE_URL and SUPABASE_SECRET_KEY environment variables');
+    process.exit(1);
+}
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const httpServer = http.createServer(app);
 const io = new Server(httpServer, { cors: { origin: true, credentials: true } });
@@ -96,53 +106,19 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// Ensure data directory and file exist
-async function initializeDataFile() {
-    const dataDir = path.join(__dirname, 'data');
-    try {
-        await fs.mkdir(dataDir, { recursive: true });
-        try {
-            await fs.access(DATA_FILE);
-        } catch {
-            // File doesn't exist, create with default data
-            const defaultData = {
-                locations: [
-                    { id: 'jhb', name: 'JHB Office', capacity: 21 },
-                    { id: 'cpt', name: 'Cape Town Office', capacity: 15 },
-                    { id: 'dbn', name: 'Durban Office', capacity: 10 }
-                ],
-                teams: [],
-                bookings: [],
-                publicHolidays: [
-                    { date: '2026-01-01', name: 'New Year\'s Day' },
-                    { date: '2026-03-21', name: 'Human Rights Day' },
-                    { date: '2026-04-03', name: 'Good Friday' },
-                    { date: '2026-04-06', name: 'Family Day' },
-                    { date: '2026-04-27', name: 'Freedom Day' },
-                    { date: '2026-05-01', name: 'Workers\' Day' },
-                    { date: '2026-06-16', name: 'Youth Day' },
-                    { date: '2026-08-10', name: 'National Women\'s Day' },
-                    { date: '2026-09-24', name: 'Heritage Day' },
-                    { date: '2026-12-16', name: 'Day of Reconciliation' },
-                    { date: '2026-12-25', name: 'Christmas Day' },
-                    { date: '2026-12-26', name: 'Day of Goodwill' }
-                ]
-            };
-            await fs.writeFile(DATA_FILE, JSON.stringify(defaultData, null, 2));
-        }
-    } catch (error) {
-        console.error('Error initializing data file:', error);
+// Helper function to convert snake_case to camelCase
+function toCamelCase(obj) {
+    if (Array.isArray(obj)) {
+        return obj.map(toCamelCase);
     }
-}
-
-// Helper functions
-async function readData() {
-    const data = await fs.readFile(DATA_FILE, 'utf8');
-    return JSON.parse(data);
-}
-
-async function writeData(data) {
-    await fs.writeFile(DATA_FILE, JSON.stringify(data, null, 2));
+    if (obj !== null && typeof obj === 'object') {
+        return Object.keys(obj).reduce((acc, key) => {
+            const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+            acc[camelKey] = toCamelCase(obj[key]);
+            return acc;
+        }, {});
+    }
+    return obj;
 }
 
 // API Routes
@@ -150,9 +126,39 @@ async function writeData(data) {
 // Get all data (locations, teams, bookings, holidays)
 app.get('/api/data', async (req, res) => {
     try {
-        const data = await readData();
-        res.json(data);
+        const [
+            { data: locations, error: locError },
+            { data: teams, error: teamError },
+            { data: bookings, error: bookError },
+            { data: publicHolidays, error: holidayError },
+            { data: desks, error: deskError },
+            { data: deskBookings, error: deskBookError },
+            { data: floorElements, error: floorError }
+        ] = await Promise.all([
+            supabase.from('locations').select('*'),
+            supabase.from('teams').select('*'),
+            supabase.from('bookings').select('*'),
+            supabase.from('public_holidays').select('*'),
+            supabase.from('desks').select('*'),
+            supabase.from('desk_bookings').select('*'),
+            supabase.from('floor_elements').select('*')
+        ]);
+
+        if (locError || teamError || bookError || holidayError || deskError || deskBookError || floorError) {
+            throw new Error('Failed to fetch data');
+        }
+
+        res.json({
+            locations: toCamelCase(locations),
+            teams: toCamelCase(teams),
+            bookings: toCamelCase(bookings),
+            publicHolidays: toCamelCase(publicHolidays),
+            desks: toCamelCase(desks),
+            deskBookings: toCamelCase(deskBookings),
+            floorElements: toCamelCase(floorElements)
+        });
     } catch (error) {
+        console.error('Error fetching data:', error);
         res.status(500).json({ error: 'Failed to read data' });
     }
 });
@@ -161,24 +167,25 @@ app.get('/api/data', async (req, res) => {
 app.get('/api/bookings', async (req, res) => {
     try {
         const { year, month, location } = req.query;
-        const data = await readData();
         
-        let bookings = data.bookings;
+        let query = supabase.from('bookings').select('*');
         
         if (year && month) {
-            bookings = bookings.filter(b => {
-                const date = new Date(b.date);
-                return date.getFullYear() === parseInt(year) && 
-                       date.getMonth() === parseInt(month);
-            });
+            const startDate = `${year}-${String(parseInt(month) + 1).padStart(2, '0')}-01`;
+            const endDate = new Date(parseInt(year), parseInt(month) + 1, 0).toISOString().split('T')[0];
+            query = query.gte('date', startDate).lte('date', endDate);
         }
         
         if (location) {
-            bookings = bookings.filter(b => b.locationId === location);
+            query = query.eq('location_id', location);
         }
         
-        res.json(bookings);
+        const { data, error } = await query;
+        
+        if (error) throw error;
+        res.json(toCamelCase(data));
     } catch (error) {
+        console.error('Error fetching bookings:', error);
         res.status(500).json({ error: 'Failed to fetch bookings' });
     }
 });
@@ -192,17 +199,25 @@ app.post('/api/bookings', async (req, res) => {
             return res.status(400).json({ error: 'Missing required fields' });
         }
         
-        const data = await readData();
-        const location = data.locations.find(l => l.id === locationId);
+        // Get location capacity
+        const { data: location, error: locError } = await supabase
+            .from('locations')
+            .select('capacity')
+            .eq('id', locationId)
+            .single();
         
-        if (!location) {
+        if (locError || !location) {
             return res.status(400).json({ error: 'Invalid location' });
         }
         
         // Check if team already has a booking for this date and location
-        const existingTeamBooking = data.bookings.find(
-            b => b.date === date && b.locationId === locationId && b.teamId === teamId
-        );
+        const { data: existingTeamBooking } = await supabase
+            .from('bookings')
+            .select('id')
+            .eq('date', date)
+            .eq('location_id', locationId)
+            .eq('team_id', teamId)
+            .single();
         
         if (existingTeamBooking) {
             return res.status(400).json({ 
@@ -211,10 +226,13 @@ app.post('/api/bookings', async (req, res) => {
         }
         
         // Calculate current bookings for that date and location
-        const existingBookings = data.bookings.filter(
-            b => b.date === date && b.locationId === locationId
-        );
-        const currentTotal = existingBookings.reduce((sum, b) => sum + b.peopleCount, 0);
+        const { data: existingBookings } = await supabase
+            .from('bookings')
+            .select('people_count')
+            .eq('date', date)
+            .eq('location_id', locationId);
+        
+        const currentTotal = (existingBookings || []).reduce((sum, b) => sum + b.people_count, 0);
         
         if (currentTotal + peopleCount > location.capacity) {
             return res.status(400).json({ 
@@ -225,24 +243,31 @@ app.post('/api/bookings', async (req, res) => {
         const newBooking = {
             id: Date.now().toString(),
             date,
-            teamId,
-            teamName: teamName || teamId,
-            peopleCount: parseInt(peopleCount),
-            locationId,
+            team_id: teamId,
+            team_name: teamName || teamId,
+            people_count: parseInt(peopleCount),
+            location_id: locationId,
             notes: notes || '',
-            createdAt: new Date().toISOString()
+            created_at: new Date().toISOString()
         };
         
-        data.bookings.push(newBooking);
-        await writeData(data);
+        const { data, error } = await supabase
+            .from('bookings')
+            .insert(newBooking)
+            .select()
+            .single();
+        
+        if (error) throw error;
 
-        emitRoomDataChanged(roomKeyForBooking(newBooking.date, newBooking.locationId), {
+        const booking = toCamelCase(data);
+        emitRoomDataChanged(roomKeyForBooking(booking.date, booking.locationId), {
             type: 'booking:created',
-            booking: newBooking
+            booking
         });
         
-        res.status(201).json(newBooking);
+        res.status(201).json(booking);
     } catch (error) {
+        console.error('Error creating booking:', error);
         res.status(500).json({ error: 'Failed to create booking' });
     }
 });
@@ -253,38 +278,55 @@ app.put('/api/bookings/:id', async (req, res) => {
         const { id } = req.params;
         const updates = req.body;
         
-        const data = await readData();
-        const bookingIndex = data.bookings.findIndex(b => b.id === id);
+        // Get current booking
+        const { data: booking, error: fetchError } = await supabase
+            .from('bookings')
+            .select('*')
+            .eq('id', id)
+            .single();
         
-        if (bookingIndex === -1) {
+        if (fetchError || !booking) {
             return res.status(404).json({ error: 'Booking not found' });
         }
         
-        const booking = data.bookings[bookingIndex];
         const targetDate = updates.date || booking.date;
-        const targetLocation = updates.locationId || booking.locationId;
-        const targetTeamId = updates.teamId || booking.teamId;
+        const targetLocation = updates.locationId || booking.location_id;
+        const targetTeamId = updates.teamId || booking.team_id;
         
         // Check if team already has a booking for the target date (if date is changing)
         if (updates.date && updates.date !== booking.date) {
-            const existingTeamBooking = data.bookings.find(
-                b => b.date === updates.date && b.locationId === targetLocation && b.teamId === targetTeamId && b.id !== id
-            );
+            const { data: existingTeamBooking } = await supabase
+                .from('bookings')
+                .select('id')
+                .eq('date', updates.date)
+                .eq('location_id', targetLocation)
+                .eq('team_id', targetTeamId)
+                .neq('id', id)
+                .single();
             
             if (existingTeamBooking) {
                 return res.status(400).json({ 
-                    error: `${booking.teamName} already has a booking for that date` 
+                    error: `${booking.team_name} already has a booking for that date` 
                 });
             }
         }
         
-        // Check capacity if updating people count or moving to a different date
-        const location = data.locations.find(l => l.id === targetLocation);
-        const otherBookings = data.bookings.filter(
-            b => b.date === targetDate && b.locationId === targetLocation && b.id !== id
-        );
-        const otherTotal = otherBookings.reduce((sum, b) => sum + b.peopleCount, 0);
-        const newPeopleCount = updates.peopleCount ? parseInt(updates.peopleCount) : booking.peopleCount;
+        // Check capacity
+        const { data: location } = await supabase
+            .from('locations')
+            .select('capacity')
+            .eq('id', targetLocation)
+            .single();
+        
+        const { data: otherBookings } = await supabase
+            .from('bookings')
+            .select('people_count')
+            .eq('date', targetDate)
+            .eq('location_id', targetLocation)
+            .neq('id', id);
+        
+        const otherTotal = (otherBookings || []).reduce((sum, b) => sum + b.people_count, 0);
+        const newPeopleCount = updates.peopleCount ? parseInt(updates.peopleCount) : booking.people_count;
         
         if (otherTotal + newPeopleCount > location.capacity) {
             return res.status(400).json({ 
@@ -292,11 +334,26 @@ app.put('/api/bookings/:id', async (req, res) => {
             });
         }
         
-        const before = data.bookings[bookingIndex];
-        data.bookings[bookingIndex] = { ...before, ...updates };
-        await writeData(data);
+        // Convert camelCase to snake_case for update
+        const dbUpdates = {};
+        if (updates.date) dbUpdates.date = updates.date;
+        if (updates.teamId) dbUpdates.team_id = updates.teamId;
+        if (updates.teamName) dbUpdates.team_name = updates.teamName;
+        if (updates.peopleCount) dbUpdates.people_count = parseInt(updates.peopleCount);
+        if (updates.locationId) dbUpdates.location_id = updates.locationId;
+        if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+        
+        const { data: updated, error: updateError } = await supabase
+            .from('bookings')
+            .update(dbUpdates)
+            .eq('id', id)
+            .select()
+            .single();
+        
+        if (updateError) throw updateError;
 
-        const after = data.bookings[bookingIndex];
+        const before = toCamelCase(booking);
+        const after = toCamelCase(updated);
         const beforeRoom = roomKeyForBooking(before.date, before.locationId);
         const afterRoom = roomKeyForBooking(after.date, after.locationId);
 
@@ -307,6 +364,7 @@ app.put('/api/bookings/:id', async (req, res) => {
         
         res.json(after);
     } catch (error) {
+        console.error('Error updating booking:', error);
         res.status(500).json({ error: 'Failed to update booking' });
     }
 });
@@ -315,18 +373,30 @@ app.put('/api/bookings/:id', async (req, res) => {
 app.get('/api/bookings/:id/ics', async (req, res) => {
     try {
         const { id } = req.params;
-        const data = await readData();
-        const booking = data.bookings.find(b => b.id === id);
         
-        if (!booking) {
+        const { data: booking, error: bookingError } = await supabase
+            .from('bookings')
+            .select('*')
+            .eq('id', id)
+            .single();
+        
+        if (bookingError || !booking) {
             return res.status(404).json({ error: 'Booking not found' });
         }
         
-        const location = data.locations.find(l => l.id === booking.locationId);
-        const team = data.teams.find(t => t.id === booking.teamId);
+        const { data: location } = await supabase
+            .from('locations')
+            .select('name')
+            .eq('id', booking.location_id)
+            .single();
+        
+        const { data: team } = await supabase
+            .from('teams')
+            .select('manager')
+            .eq('id', booking.team_id)
+            .single();
         
         const startDate = booking.date.replace(/-/g, '');
-        const endDate = startDate; // Same day
         
         const icsContent = [
             'BEGIN:VCALENDAR',
@@ -337,8 +407,8 @@ app.get('/api/bookings/:id/ics', async (req, res) => {
             'BEGIN:VEVENT',
             `DTSTART;VALUE=DATE:${startDate}`,
             `DTEND;VALUE=DATE:${startDate}`,
-            `SUMMARY:${booking.teamName} - Office Booking`,
-            `DESCRIPTION:Team: ${booking.teamName}\\nPeople: ${booking.peopleCount}\\nManager: ${team?.manager || 'N/A'}\\n${booking.notes || ''}`,
+            `SUMMARY:${booking.team_name} - Office Booking`,
+            `DESCRIPTION:Team: ${booking.team_name}\\nPeople: ${booking.people_count}\\nManager: ${team?.manager || 'N/A'}\\n${booking.notes || ''}`,
             `LOCATION:${location?.name || 'Office'}`,
             `UID:${booking.id}@officebooking`,
             'STATUS:CONFIRMED',
@@ -350,6 +420,7 @@ app.get('/api/bookings/:id/ics', async (req, res) => {
         res.setHeader('Content-Disposition', `attachment; filename="booking-${booking.id}.ics"`);
         res.send(icsContent);
     } catch (error) {
+        console.error('Error generating ICS:', error);
         res.status(500).json({ error: 'Failed to generate calendar file' });
     }
 });
@@ -358,17 +429,26 @@ app.get('/api/bookings/:id/ics', async (req, res) => {
 app.delete('/api/bookings/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const data = await readData();
         
-        const bookingIndex = data.bookings.findIndex(b => b.id === id);
-        if (bookingIndex === -1) {
+        // Get booking first for socket emit
+        const { data: booking } = await supabase
+            .from('bookings')
+            .select('*')
+            .eq('id', id)
+            .single();
+        
+        if (!booking) {
             return res.status(404).json({ error: 'Booking not found' });
         }
         
-        const removed = data.bookings[bookingIndex];
-        data.bookings.splice(bookingIndex, 1);
-        await writeData(data);
+        const { error } = await supabase
+            .from('bookings')
+            .delete()
+            .eq('id', id);
+        
+        if (error) throw error;
 
+        const removed = toCamelCase(booking);
         emitRoomDataChanged(roomKeyForBooking(removed.date, removed.locationId), {
             type: 'booking:deleted',
             booking: removed
@@ -376,6 +456,7 @@ app.delete('/api/bookings/:id', async (req, res) => {
         
         res.json({ success: true });
     } catch (error) {
+        console.error('Error deleting booking:', error);
         res.status(500).json({ error: 'Failed to delete booking' });
     }
 });
@@ -384,7 +465,6 @@ app.delete('/api/bookings/:id', async (req, res) => {
 app.post('/api/locations', async (req, res) => {
     try {
         const { name, address, capacity } = req.body;
-        const data = await readData();
         
         const newLocation = {
             id: name.toLowerCase().replace(/\s+/g, '-'),
@@ -393,11 +473,16 @@ app.post('/api/locations', async (req, res) => {
             capacity: parseInt(capacity) || 21
         };
         
-        data.locations.push(newLocation);
-        await writeData(data);
+        const { data, error } = await supabase
+            .from('locations')
+            .insert(newLocation)
+            .select()
+            .single();
         
-        res.status(201).json(newLocation);
+        if (error) throw error;
+        res.status(201).json(toCamelCase(data));
     } catch (error) {
+        console.error('Error creating location:', error);
         res.status(500).json({ error: 'Failed to create location' });
     }
 });
@@ -405,14 +490,19 @@ app.post('/api/locations', async (req, res) => {
 app.delete('/api/locations/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const data = await readData();
         
-        data.locations = data.locations.filter(l => l.id !== id);
-        data.bookings = data.bookings.filter(b => b.locationId !== id);
-        await writeData(data);
+        // Delete associated bookings first (cascade should handle this, but being explicit)
+        await supabase.from('bookings').delete().eq('location_id', id);
         
+        const { error } = await supabase
+            .from('locations')
+            .delete()
+            .eq('id', id);
+        
+        if (error) throw error;
         res.json({ success: true });
     } catch (error) {
+        console.error('Error deleting location:', error);
         res.status(500).json({ error: 'Failed to delete location' });
     }
 });
@@ -423,30 +513,28 @@ app.put('/api/locations/:id', async (req, res) => {
         const { id } = req.params;
         const updates = req.body;
         
-        const data = await readData();
-        const locationIndex = data.locations.findIndex(l => l.id === id);
+        const dbUpdates = {};
+        if (updates.name) dbUpdates.name = updates.name;
+        if (updates.address !== undefined) dbUpdates.address = updates.address;
+        if (updates.capacity) dbUpdates.capacity = parseInt(updates.capacity);
+        if (updates.floorPlanWidth) dbUpdates.floor_plan_width = parseInt(updates.floorPlanWidth);
+        if (updates.floorPlanHeight) dbUpdates.floor_plan_height = parseInt(updates.floorPlanHeight);
         
-        if (locationIndex === -1) {
+        const { data, error } = await supabase
+            .from('locations')
+            .update(dbUpdates)
+            .eq('id', id)
+            .select()
+            .single();
+        
+        if (error) throw error;
+        if (!data) {
             return res.status(404).json({ error: 'Location not found' });
         }
         
-        if (updates.capacity) {
-            updates.capacity = parseInt(updates.capacity);
-        }
-        
-        // Handle floor plan dimensions
-        if (updates.floorPlanWidth) {
-            updates.floorPlanWidth = parseInt(updates.floorPlanWidth);
-        }
-        if (updates.floorPlanHeight) {
-            updates.floorPlanHeight = parseInt(updates.floorPlanHeight);
-        }
-        
-        data.locations[locationIndex] = { ...data.locations[locationIndex], ...updates };
-        await writeData(data);
-        
-        res.json(data.locations[locationIndex]);
+        res.json(toCamelCase(data));
     } catch (error) {
+        console.error('Error updating location:', error);
         res.status(500).json({ error: 'Failed to update location' });
     }
 });
@@ -455,7 +543,7 @@ app.put('/api/locations/:id', async (req, res) => {
 app.get('/api/holidays/fetch/:year', async (req, res) => {
     try {
         const { year } = req.params;
-        const country = req.query.country || 'ZA'; // Default to South Africa
+        const country = req.query.country || 'ZA';
         
         const https = require('https');
         
@@ -477,7 +565,6 @@ app.get('/api/holidays/fetch/:year', async (req, res) => {
         
         const holidays = await fetchHolidays();
         
-        // Transform to our format
         const formattedHolidays = holidays.map(h => ({
             date: h.date,
             name: h.localName || h.name
@@ -494,19 +581,22 @@ app.get('/api/holidays/fetch/:year', async (req, res) => {
 app.post('/api/holidays', async (req, res) => {
     try {
         const { holidays } = req.body;
-        const data = await readData();
         
-        // Merge with existing holidays (replace same dates)
-        const existingDates = new Set(holidays.map(h => h.date));
-        const otherHolidays = data.publicHolidays.filter(h => !existingDates.has(h.date));
+        // Upsert holidays (insert or update on conflict)
+        const { error } = await supabase
+            .from('public_holidays')
+            .upsert(holidays.map(h => ({ date: h.date, name: h.name })), { onConflict: 'date' });
         
-        data.publicHolidays = [...otherHolidays, ...holidays].sort((a, b) => 
-            new Date(a.date) - new Date(b.date)
-        );
+        if (error) throw error;
         
-        await writeData(data);
-        res.json(data.publicHolidays);
+        const { data: allHolidays } = await supabase
+            .from('public_holidays')
+            .select('*')
+            .order('date');
+        
+        res.json(toCamelCase(allHolidays));
     } catch (error) {
+        console.error('Error updating holidays:', error);
         res.status(500).json({ error: 'Failed to update holidays' });
     }
 });
@@ -515,13 +605,16 @@ app.post('/api/holidays', async (req, res) => {
 app.delete('/api/holidays/:date', async (req, res) => {
     try {
         const { date } = req.params;
-        const data = await readData();
         
-        data.publicHolidays = data.publicHolidays.filter(h => h.date !== date);
-        await writeData(data);
+        const { error } = await supabase
+            .from('public_holidays')
+            .delete()
+            .eq('date', date);
         
+        if (error) throw error;
         res.json({ success: true });
     } catch (error) {
+        console.error('Error deleting holiday:', error);
         res.status(500).json({ error: 'Failed to delete holiday' });
     }
 });
@@ -530,7 +623,6 @@ app.delete('/api/holidays/:date', async (req, res) => {
 app.post('/api/teams', async (req, res) => {
     try {
         const { name, color, memberCount, manager, managerImage, locationId } = req.body;
-        const data = await readData();
         
         if (!locationId) {
             return res.status(400).json({ error: 'Location is required' });
@@ -540,17 +632,22 @@ app.post('/api/teams', async (req, res) => {
             id: name.toLowerCase().replace(/\s+/g, '-'),
             name,
             manager: manager || '',
-            managerImage: managerImage || '',
+            manager_image: managerImage || '',
             color: color || '#6B7280',
-            memberCount: parseInt(memberCount) || 1,
-            locationId: locationId
+            member_count: parseInt(memberCount) || 1,
+            location_id: locationId
         };
         
-        data.teams.push(newTeam);
-        await writeData(data);
+        const { data, error } = await supabase
+            .from('teams')
+            .insert(newTeam)
+            .select()
+            .single();
         
-        res.status(201).json(newTeam);
+        if (error) throw error;
+        res.status(201).json(toCamelCase(data));
     } catch (error) {
+        console.error('Error creating team:', error);
         res.status(500).json({ error: 'Failed to create team' });
     }
 });
@@ -561,18 +658,29 @@ app.put('/api/teams/:id', async (req, res) => {
         const { id } = req.params;
         const updates = req.body;
         
-        const data = await readData();
-        const teamIndex = data.teams.findIndex(t => t.id === id);
+        const dbUpdates = {};
+        if (updates.name) dbUpdates.name = updates.name;
+        if (updates.manager !== undefined) dbUpdates.manager = updates.manager;
+        if (updates.managerImage !== undefined) dbUpdates.manager_image = updates.managerImage;
+        if (updates.color) dbUpdates.color = updates.color;
+        if (updates.memberCount) dbUpdates.member_count = parseInt(updates.memberCount);
+        if (updates.locationId) dbUpdates.location_id = updates.locationId;
         
-        if (teamIndex === -1) {
+        const { data, error } = await supabase
+            .from('teams')
+            .update(dbUpdates)
+            .eq('id', id)
+            .select()
+            .single();
+        
+        if (error) throw error;
+        if (!data) {
             return res.status(404).json({ error: 'Team not found' });
         }
         
-        data.teams[teamIndex] = { ...data.teams[teamIndex], ...updates };
-        await writeData(data);
-        
-        res.json(data.teams[teamIndex]);
+        res.json(toCamelCase(data));
     } catch (error) {
+        console.error('Error updating team:', error);
         res.status(500).json({ error: 'Failed to update team' });
     }
 });
@@ -580,13 +688,16 @@ app.put('/api/teams/:id', async (req, res) => {
 app.delete('/api/teams/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const data = await readData();
         
-        data.teams = data.teams.filter(t => t.id !== id);
-        await writeData(data);
+        const { error } = await supabase
+            .from('teams')
+            .delete()
+            .eq('id', id);
         
+        if (error) throw error;
         res.json({ success: true });
     } catch (error) {
+        console.error('Error deleting team:', error);
         res.status(500).json({ error: 'Failed to delete team' });
     }
 });
@@ -599,17 +710,18 @@ app.delete('/api/teams/:id', async (req, res) => {
 app.get('/api/desks', async (req, res) => {
     try {
         const { locationId } = req.query;
-        const data = await readData();
         
-        if (!data.desks) data.desks = [];
-        
-        let desks = data.desks;
+        let query = supabase.from('desks').select('*');
         if (locationId) {
-            desks = desks.filter(d => d.locationId === locationId);
+            query = query.eq('location_id', locationId);
         }
         
-        res.json(desks);
+        const { data, error } = await query;
+        if (error) throw error;
+        
+        res.json(toCamelCase(data));
     } catch (error) {
+        console.error('Error fetching desks:', error);
         res.status(500).json({ error: 'Failed to fetch desks' });
     }
 });
@@ -623,31 +735,33 @@ app.post('/api/desks', async (req, res) => {
             return res.status(400).json({ error: 'Name and location are required' });
         }
         
-        const data = await readData();
-        if (!data.desks) data.desks = [];
-        
         const newDesk = {
             id: Date.now().toString(),
             name,
-            locationId,
+            location_id: locationId,
             floor: floor || '1',
             zone: zone || '',
             x: x || 0,
             y: y || 0,
             width: width || 60,
             height: height || 40,
-            deskType: deskType || 'hotseat', // hotseat, team_seat, unavailable
-            assignedTeamId: assignedTeamId || null,
-            chairPositions: chairPositions || ['bottom'], // top, bottom, left, right
-            qrCode: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            createdAt: new Date().toISOString()
+            desk_type: deskType || 'hotseat',
+            assigned_team_id: assignedTeamId || null,
+            chair_positions: chairPositions || ['bottom'],
+            qr_code: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            created_at: new Date().toISOString()
         };
         
-        data.desks.push(newDesk);
-        await writeData(data);
+        const { data, error } = await supabase
+            .from('desks')
+            .insert(newDesk)
+            .select()
+            .single();
         
-        res.status(201).json(newDesk);
+        if (error) throw error;
+        res.status(201).json(toCamelCase(data));
     } catch (error) {
+        console.error('Error creating desk:', error);
         res.status(500).json({ error: 'Failed to create desk' });
     }
 });
@@ -656,15 +770,17 @@ app.post('/api/desks', async (req, res) => {
 app.get('/api/floor-elements', async (req, res) => {
     try {
         const { locationId, floor } = req.query;
-        const data = await readData();
-        if (!data.floorElements) data.floorElements = [];
         
-        let elements = data.floorElements;
-        if (locationId) elements = elements.filter(e => e.locationId === locationId);
-        if (floor) elements = elements.filter(e => e.floor === floor);
+        let query = supabase.from('floor_elements').select('*');
+        if (locationId) query = query.eq('location_id', locationId);
+        if (floor) query = query.eq('floor', floor);
         
-        res.json(elements);
+        const { data, error } = await query;
+        if (error) throw error;
+        
+        res.json(toCamelCase(data));
     } catch (error) {
+        console.error('Error fetching floor elements:', error);
         res.status(500).json({ error: 'Failed to get floor elements' });
     }
 });
@@ -677,29 +793,31 @@ app.post('/api/floor-elements', async (req, res) => {
             return res.status(400).json({ error: 'Type and location are required' });
         }
         
-        const data = await readData();
-        if (!data.floorElements) data.floorElements = [];
-        
         const newElement = {
             id: Date.now().toString(),
-            type, // wall, room, label
-            locationId,
+            type,
+            location_id: locationId,
             floor: floor || '1',
             x: x || 0,
             y: y || 0,
             width: width || 100,
             height: height || 100,
-            points: points || [], // For walls/lines
+            points: points || [],
             label: label || '',
             color: color || null,
-            createdAt: new Date().toISOString()
+            created_at: new Date().toISOString()
         };
         
-        data.floorElements.push(newElement);
-        await writeData(data);
+        const { data, error } = await supabase
+            .from('floor_elements')
+            .insert(newElement)
+            .select()
+            .single();
         
-        res.status(201).json(newElement);
+        if (error) throw error;
+        res.status(201).json(toCamelCase(data));
     } catch (error) {
+        console.error('Error creating floor element:', error);
         res.status(500).json({ error: 'Failed to create floor element' });
     }
 });
@@ -709,19 +827,33 @@ app.put('/api/floor-elements/:id', async (req, res) => {
         const { id } = req.params;
         const updates = req.body;
         
-        const data = await readData();
-        if (!data.floorElements) data.floorElements = [];
+        const dbUpdates = {};
+        if (updates.type) dbUpdates.type = updates.type;
+        if (updates.locationId) dbUpdates.location_id = updates.locationId;
+        if (updates.floor) dbUpdates.floor = updates.floor;
+        if (updates.x !== undefined) dbUpdates.x = updates.x;
+        if (updates.y !== undefined) dbUpdates.y = updates.y;
+        if (updates.width !== undefined) dbUpdates.width = updates.width;
+        if (updates.height !== undefined) dbUpdates.height = updates.height;
+        if (updates.points) dbUpdates.points = updates.points;
+        if (updates.label !== undefined) dbUpdates.label = updates.label;
+        if (updates.color !== undefined) dbUpdates.color = updates.color;
         
-        const elementIndex = data.floorElements.findIndex(e => e.id === id);
-        if (elementIndex === -1) {
+        const { data, error } = await supabase
+            .from('floor_elements')
+            .update(dbUpdates)
+            .eq('id', id)
+            .select()
+            .single();
+        
+        if (error) throw error;
+        if (!data) {
             return res.status(404).json({ error: 'Element not found' });
         }
         
-        data.floorElements[elementIndex] = { ...data.floorElements[elementIndex], ...updates };
-        await writeData(data);
-        
-        res.json(data.floorElements[elementIndex]);
+        res.json(toCamelCase(data));
     } catch (error) {
+        console.error('Error updating floor element:', error);
         res.status(500).json({ error: 'Failed to update floor element' });
     }
 });
@@ -730,14 +862,15 @@ app.delete('/api/floor-elements/:id', async (req, res) => {
     try {
         const { id } = req.params;
         
-        const data = await readData();
-        if (!data.floorElements) data.floorElements = [];
+        const { error } = await supabase
+            .from('floor_elements')
+            .delete()
+            .eq('id', id);
         
-        data.floorElements = data.floorElements.filter(e => e.id !== id);
-        await writeData(data);
-        
+        if (error) throw error;
         res.json({ success: true });
     } catch (error) {
+        console.error('Error deleting floor element:', error);
         res.status(500).json({ error: 'Failed to delete floor element' });
     }
 });
@@ -748,19 +881,34 @@ app.put('/api/desks/:id', async (req, res) => {
         const { id } = req.params;
         const updates = req.body;
         
-        const data = await readData();
-        if (!data.desks) data.desks = [];
+        const dbUpdates = {};
+        if (updates.name) dbUpdates.name = updates.name;
+        if (updates.locationId) dbUpdates.location_id = updates.locationId;
+        if (updates.floor) dbUpdates.floor = updates.floor;
+        if (updates.zone !== undefined) dbUpdates.zone = updates.zone;
+        if (updates.x !== undefined) dbUpdates.x = updates.x;
+        if (updates.y !== undefined) dbUpdates.y = updates.y;
+        if (updates.width !== undefined) dbUpdates.width = updates.width;
+        if (updates.height !== undefined) dbUpdates.height = updates.height;
+        if (updates.deskType) dbUpdates.desk_type = updates.deskType;
+        if (updates.assignedTeamId !== undefined) dbUpdates.assigned_team_id = updates.assignedTeamId;
+        if (updates.chairPositions) dbUpdates.chair_positions = updates.chairPositions;
         
-        const deskIndex = data.desks.findIndex(d => d.id === id);
-        if (deskIndex === -1) {
+        const { data, error } = await supabase
+            .from('desks')
+            .update(dbUpdates)
+            .eq('id', id)
+            .select()
+            .single();
+        
+        if (error) throw error;
+        if (!data) {
             return res.status(404).json({ error: 'Desk not found' });
         }
         
-        data.desks[deskIndex] = { ...data.desks[deskIndex], ...updates };
-        await writeData(data);
-        
-        res.json(data.desks[deskIndex]);
+        res.json(toCamelCase(data));
     } catch (error) {
+        console.error('Error updating desk:', error);
         res.status(500).json({ error: 'Failed to update desk' });
     }
 });
@@ -769,19 +917,19 @@ app.put('/api/desks/:id', async (req, res) => {
 app.delete('/api/desks/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const data = await readData();
         
-        if (!data.desks) data.desks = [];
-        data.desks = data.desks.filter(d => d.id !== id);
+        // Delete desk bookings first (cascade should handle this)
+        await supabase.from('desk_bookings').delete().eq('desk_id', id);
         
-        // Also delete all bookings for this desk
-        if (!data.deskBookings) data.deskBookings = [];
-        data.deskBookings = data.deskBookings.filter(b => b.deskId !== id);
+        const { error } = await supabase
+            .from('desks')
+            .delete()
+            .eq('id', id);
         
-        await writeData(data);
-        
+        if (error) throw error;
         res.json({ success: true });
     } catch (error) {
+        console.error('Error deleting desk:', error);
         res.status(500).json({ error: 'Failed to delete desk' });
     }
 });
@@ -794,24 +942,19 @@ app.delete('/api/desks/:id', async (req, res) => {
 app.get('/api/desk-bookings', async (req, res) => {
     try {
         const { date, locationId, deskId } = req.query;
-        const data = await readData();
         
-        if (!data.deskBookings) data.deskBookings = [];
+        let query = supabase.from('desk_bookings').select('*');
         
-        let bookings = data.deskBookings;
+        if (date) query = query.eq('date', date);
+        if (locationId) query = query.eq('location_id', locationId);
+        if (deskId) query = query.eq('desk_id', deskId);
         
-        if (date) {
-            bookings = bookings.filter(b => b.date === date);
-        }
-        if (locationId) {
-            bookings = bookings.filter(b => b.locationId === locationId);
-        }
-        if (deskId) {
-            bookings = bookings.filter(b => b.deskId === deskId);
-        }
+        const { data, error } = await query;
+        if (error) throw error;
         
-        res.json(bookings);
+        res.json(toCamelCase(data));
     } catch (error) {
+        console.error('Error fetching desk bookings:', error);
         res.status(500).json({ error: 'Failed to fetch desk bookings' });
     }
 });
@@ -825,49 +968,55 @@ app.post('/api/desk-bookings', async (req, res) => {
             return res.status(400).json({ error: 'Missing required fields' });
         }
         
-        const data = await readData();
-        if (!data.deskBookings) data.deskBookings = [];
-        if (!data.desks) data.desks = [];
+        // Get desk info
+        const { data: desk, error: deskError } = await supabase
+            .from('desks')
+            .select('*')
+            .eq('id', deskId)
+            .single();
         
-        const desk = data.desks.find(d => d.id === deskId);
-        if (!desk) {
+        if (deskError || !desk) {
             return res.status(400).json({ error: 'Desk not found' });
         }
         
         // Check for conflicts
-        const conflict = data.deskBookings.find(b => 
-            b.deskId === deskId && 
-            b.date === date &&
-            ((startTime >= b.startTime && startTime < b.endTime) ||
-             (endTime > b.startTime && endTime <= b.endTime) ||
-             (startTime <= b.startTime && endTime >= b.endTime))
-        );
+        const { data: conflicts } = await supabase
+            .from('desk_bookings')
+            .select('id')
+            .eq('desk_id', deskId)
+            .eq('date', date)
+            .or(`and(start_time.lt.${endTime},end_time.gt.${startTime})`);
         
-        if (conflict) {
+        if (conflicts && conflicts.length > 0) {
             return res.status(400).json({ error: 'Time slot already booked' });
         }
         
         const newBooking = {
             id: Date.now().toString(),
-            deskId,
-            deskName: desk.name,
-            locationId: desk.locationId,
+            desk_id: deskId,
+            desk_name: desk.name,
+            location_id: desk.location_id,
             date,
-            startTime,
-            endTime,
-            employeeName,
-            employeeEmail: employeeEmail || '',
-            teamId: teamId || null,
-            checkedIn: false,
-            checkedInAt: null,
-            createdAt: new Date().toISOString()
+            start_time: startTime,
+            end_time: endTime,
+            employee_name: employeeName,
+            employee_email: employeeEmail || '',
+            team_id: teamId || null,
+            checked_in: false,
+            checked_in_at: null,
+            created_at: new Date().toISOString()
         };
         
-        data.deskBookings.push(newBooking);
-        await writeData(data);
+        const { data, error } = await supabase
+            .from('desk_bookings')
+            .insert(newBooking)
+            .select()
+            .single();
         
-        res.status(201).json(newBooking);
+        if (error) throw error;
+        res.status(201).json(toCamelCase(data));
     } catch (error) {
+        console.error('Error creating desk booking:', error);
         res.status(500).json({ error: 'Failed to create desk booking' });
     }
 });
@@ -876,15 +1025,16 @@ app.post('/api/desk-bookings', async (req, res) => {
 app.delete('/api/desk-bookings/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const data = await readData();
         
-        if (!data.deskBookings) data.deskBookings = [];
-        data.deskBookings = data.deskBookings.filter(b => b.id !== id);
+        const { error } = await supabase
+            .from('desk_bookings')
+            .delete()
+            .eq('id', id);
         
-        await writeData(data);
-        
+        if (error) throw error;
         res.json({ success: true });
     } catch (error) {
+        console.error('Error canceling desk booking:', error);
         res.status(500).json({ error: 'Failed to cancel desk booking' });
     }
 });
@@ -895,22 +1045,30 @@ app.post('/api/desk-bookings/:id/checkin', async (req, res) => {
         const { id } = req.params;
         const { qrCode } = req.body;
         
-        const data = await readData();
-        if (!data.deskBookings) data.deskBookings = [];
-        if (!data.desks) data.desks = [];
+        // Get booking
+        const { data: booking, error: bookingError } = await supabase
+            .from('desk_bookings')
+            .select('*')
+            .eq('id', id)
+            .single();
         
-        const booking = data.deskBookings.find(b => b.id === id);
-        if (!booking) {
+        if (bookingError || !booking) {
             return res.status(404).json({ error: 'Booking not found' });
         }
         
-        const desk = data.desks.find(d => d.id === booking.deskId);
-        if (!desk) {
+        // Get desk
+        const { data: desk, error: deskError } = await supabase
+            .from('desks')
+            .select('qr_code')
+            .eq('id', booking.desk_id)
+            .single();
+        
+        if (deskError || !desk) {
             return res.status(404).json({ error: 'Desk not found' });
         }
         
-        // Verify QR code matches the desk
-        if (qrCode && desk.qrCode !== qrCode) {
+        // Verify QR code
+        if (qrCode && desk.qr_code !== qrCode) {
             return res.status(400).json({ error: 'Invalid QR code for this desk' });
         }
         
@@ -920,14 +1078,22 @@ app.post('/api/desk-bookings/:id/checkin', async (req, res) => {
             return res.status(400).json({ error: 'Can only check in on the booking date' });
         }
         
-        // Mark as checked in
-        booking.checkedIn = true;
-        booking.checkedInAt = new Date().toISOString();
+        // Update booking
+        const { data: updated, error: updateError } = await supabase
+            .from('desk_bookings')
+            .update({
+                checked_in: true,
+                checked_in_at: new Date().toISOString()
+            })
+            .eq('id', id)
+            .select()
+            .single();
         
-        await writeData(data);
+        if (updateError) throw updateError;
         
-        res.json({ success: true, booking });
+        res.json({ success: true, booking: toCamelCase(updated) });
     } catch (error) {
+        console.error('Error checking in:', error);
         res.status(500).json({ error: 'Failed to check in' });
     }
 });
@@ -936,48 +1102,55 @@ app.post('/api/desk-bookings/:id/checkin', async (req, res) => {
 app.get('/api/checkin/:qrCode', async (req, res) => {
     try {
         const { qrCode } = req.params;
-        const data = await readData();
         
-        if (!data.desks) data.desks = [];
-        if (!data.deskBookings) data.deskBookings = [];
+        // Get desk by QR code
+        const { data: desk, error: deskError } = await supabase
+            .from('desks')
+            .select('*')
+            .eq('qr_code', qrCode)
+            .single();
         
-        const desk = data.desks.find(d => d.qrCode === qrCode);
-        if (!desk) {
+        if (deskError || !desk) {
             return res.status(404).json({ error: 'Desk not found' });
         }
         
-        const location = data.locations.find(l => l.id === desk.locationId);
+        // Get location
+        const { data: location } = await supabase
+            .from('locations')
+            .select('*')
+            .eq('id', desk.location_id)
+            .single();
         
         // Get today's bookings for this desk
         const today = new Date().toISOString().split('T')[0];
-        const todayBookings = data.deskBookings.filter(
-            b => b.deskId === desk.id && b.date === today
-        );
+        const { data: todayBookings } = await supabase
+            .from('desk_bookings')
+            .select('*')
+            .eq('desk_id', desk.id)
+            .eq('date', today);
         
         res.json({
-            desk,
-            location,
-            todayBookings
+            desk: toCamelCase(desk),
+            location: toCamelCase(location),
+            todayBookings: toCamelCase(todayBookings || [])
         });
     } catch (error) {
+        console.error('Error getting check-in data:', error);
         res.status(500).json({ error: 'Failed to get check-in data' });
     }
 });
 
 // Start server
-initializeDataFile().then(() => {
-    httpServer.listen(PORT, () => {
-        console.log(`
+httpServer.listen(PORT, () => {
+    console.log(`
 ╔═══════════════════════════════════════════════════════════╗
 ║                                                           ║
-║   🏢 Office Booking System                                ║
+║   🏢 Office Booking System (Supabase)                    ║
 ║                                                           ║
 ║   Server running at: http://localhost:${PORT}               ║
 ║                                                           ║
 ║   Press Ctrl+C to stop                                    ║
 ║                                                           ║
 ╚═══════════════════════════════════════════════════════════╝
-        `);
-    });
+    `);
 });
-

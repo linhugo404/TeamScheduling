@@ -934,7 +934,7 @@ function renderLocationsList() {
         `;
     }).join('');
     
-    // Initialize maps after rendering
+    // Initialize maps (will only actually create maps if containers are visible and have dimensions)
     initializeLocationMaps();
 }
 
@@ -942,21 +942,37 @@ function renderLocationsList() {
 const locationMaps = new Map();
 
 async function initializeLocationMaps() {
-    // Clean up existing maps
-    locationMaps.forEach(map => map.remove());
-    locationMaps.clear();
-    
     const mapContainers = document.querySelectorAll('.location-map[data-address]');
+    if (mapContainers.length === 0) return;
+    
+    // Check if the settings view is visible - if not, skip initialization
+    const settingsView = document.getElementById('settingsView');
+    if (!settingsView?.classList.contains('active')) return;
     
     for (const container of mapContainers) {
         const address = decodeURIComponent(container.dataset.address);
         const mapId = container.id;
         
+        // Skip if this map is already initialized (check for leaflet container or error state)
+        if (container.querySelector('.leaflet-container') || container.querySelector('.location-map-empty')) {
+            continue;
+        }
+        
+        // Skip if container has no dimensions
+        if (container.offsetWidth === 0 || container.offsetHeight === 0) {
+            continue;
+        }
+        
         try {
-            // Geocode the address using Nominatim (free)
+            // Geocode the address using Nominatim (free) with timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+            
             const response = await fetch(
-                `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`
+                `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`,
+                { signal: controller.signal }
             );
+            clearTimeout(timeoutId);
             const data = await response.json();
             
             if (data && data.length > 0) {
@@ -981,6 +997,12 @@ async function initializeLocationMaps() {
                 // Create Leaflet map with dark tiles
                 const mapElement = document.getElementById(`${mapId}-leaflet`);
                 if (!mapElement) continue;
+                
+                // Clean up existing map instance if it exists
+                if (locationMaps.has(mapId)) {
+                    try { locationMaps.get(mapId).remove(); } catch (e) {}
+                    locationMaps.delete(mapId);
+                }
                 
                 const map = L.map(mapElement, {
                     zoomControl: false,
@@ -1457,6 +1479,14 @@ function switchView(viewName) {
     if (viewName === 'desks') {
         initDesksView();
     }
+    
+    // Re-render locations when settings view becomes visible to initialize maps
+    if (viewName === 'settings') {
+        // Small delay to ensure the view is fully visible and has dimensions
+        setTimeout(() => {
+            renderLocationsList();
+        }, 200);
+    }
 }
 
 // ============================================
@@ -1736,9 +1766,10 @@ function initDesksView() {
             }
         });
         
-        // Room and label forms
+        // Room, label and wall forms
         document.getElementById('roomForm')?.addEventListener('submit', handleRoomSubmit);
         document.getElementById('labelForm')?.addEventListener('submit', handleLabelSubmit);
+        document.getElementById('wallForm')?.addEventListener('submit', handleWallSubmit);
         
         desksViewInitialized = true;
     }
@@ -1844,21 +1875,24 @@ function renderFloorMap() {
                 </div>
             `;
         } else if (el.type === 'wall') {
-            const style = `left: ${el.x || 0}px; top: ${el.y || 0}px; width: ${el.width || 100}px; height: ${el.height || 4}px;`;
-            const isHorizontal = (el.width || 100) > (el.height || 4);
-            const resizeHandles = deskState.editMode ? (isHorizontal ? `
+            const rotation = el.rotation || 0;
+            const width = el.width || 100;
+            const height = el.height || 6;
+            let style = `left: ${el.x || 0}px; top: ${el.y || 0}px; width: ${width}px; height: ${height}px;`;
+            if (rotation) {
+                style += ` transform: rotate(${rotation}deg); transform-origin: left center;`;
+            }
+            const resizeHandles = deskState.editMode ? `
                 <div class="resize-handle e" data-handle="e"></div>
                 <div class="resize-handle w" data-handle="w"></div>
-            ` : `
-                <div class="resize-handle n" data-handle="n"></div>
-                <div class="resize-handle s" data-handle="s"></div>
-            `) : '';
+            ` : '';
             return `
                 <div class="floor-wall ${deskState.editMode ? 'edit-mode' : ''} ${isSelected ? 'selected' : ''}" 
                      id="element-${el.id}"
                      style="${style}"
                      data-element-id="${el.id}"
-                     data-element-type="wall">
+                     data-element-type="wall"
+                     onclick="selectElement('${el.id}', 'wall')">
                     ${resizeHandles}
                 </div>
             `;
@@ -1937,7 +1971,8 @@ function renderFloorMap() {
         
         let styleStr = `left: ${desk.x || 0}px; top: ${desk.y || 0}px; width: ${desk.width || 60}px; height: ${desk.height || 40}px;`;
         if (teamColor && isOccupied) {
-            styleStr += ` border-color: ${teamColor}; background: ${teamColor}15;`;
+            // Use team color for border, but let CSS handle background for theme compatibility
+            styleStr += ` border-color: ${teamColor}; --team-color: ${teamColor};`;
         }
         
         // Generate chair HTML
@@ -2630,27 +2665,68 @@ async function handleRoomSubmit(e) {
 }
 
 // Wall functions
-async function addWallElement() {
+function openWallModal() {
+    document.getElementById('wallModal').classList.add('active');
+    document.getElementById('editWallId').value = '';
+    document.getElementById('wallLength').value = 100;
+    document.getElementById('wallThickness').value = 6;
+    document.querySelector('input[name="wallOrientation"][value="0"]').checked = true;
+}
+
+function closeWallModal() {
+    document.getElementById('wallModal').classList.remove('active');
+    document.getElementById('wallForm').reset();
+}
+
+async function handleWallSubmit(e) {
+    e.preventDefault();
+    
+    const length = parseInt(document.getElementById('wallLength').value) || 100;
+    const thickness = parseInt(document.getElementById('wallThickness').value) || 6;
+    const rotation = parseInt(document.querySelector('input[name="wallOrientation"]:checked').value) || 0;
+    const editWallId = document.getElementById('editWallId').value;
+    
     try {
-        await fetch('/api/floor-elements', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                type: 'wall',
-                locationId: state.currentLocation,
-                floor: deskState.currentFloor,
-                x: 100,
-                y: 100,
-                width: 100,
-                height: 4
-            })
-        });
+        if (editWallId) {
+            // Update existing wall
+            await fetch(`/api/floor-elements/${editWallId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    width: length,
+                    height: thickness,
+                    rotation: rotation
+                })
+            });
+            showToast('Wall updated', 'success');
+        } else {
+            // Add new wall
+            await fetch('/api/floor-elements', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: 'wall',
+                    locationId: state.currentLocation,
+                    floor: deskState.currentFloor,
+                    x: 100,
+                    y: 100,
+                    width: length,
+                    height: thickness,
+                    rotation: rotation
+                })
+            });
+            showToast('Wall added - drag to position', 'success');
+        }
         
-        showToast('Wall added - drag to position', 'success');
+        closeWallModal();
         loadDesks();
     } catch (error) {
-        showToast('Failed to add wall', 'error');
+        showToast('Failed to save wall', 'error');
     }
+}
+
+function addWallElement() {
+    openWallModal();
 }
 
 // Label modal functions
@@ -2718,39 +2794,42 @@ function openDeskBookingModal(deskId) {
     const desk = deskState.desks.find(d => d.id === deskId);
     if (!desk) return;
     
-    // Check if desk is already booked for this day
-    const existingBooking = deskState.deskBookings.find(b => b.deskId === deskId);
-    if (existingBooking) {
-        showToast(`This desk is already booked by ${existingBooking.employeeName} for the day`, 'error');
-        return;
-    }
-    
     const modal = document.getElementById('deskBookingModal');
     const infoDiv = document.getElementById('deskBookingInfo');
+    const bookingForm = document.getElementById('deskBookingForm');
     const location = state.locations.find(l => l.id === desk.locationId);
+    
+    // Check if desk is already booked for this day
+    const existingBooking = deskState.deskBookings.find(b => b.deskId === deskId);
+    const isBooked = !!existingBooking;
     
     document.getElementById('bookingDeskId').value = deskId;
     document.getElementById('bookingDate').value = deskState.selectedDate;
     
-    // Load saved name from localStorage
-    const savedName = localStorage.getItem('employeeName');
-    const savedEmail = localStorage.getItem('employeeEmail');
-    const savedTeamId = localStorage.getItem('employeeTeamId');
-    if (savedName) document.getElementById('employeeName').value = savedName;
-    if (savedEmail) document.getElementById('employeeEmail').value = savedEmail;
+    // Show/hide the booking form based on whether desk is already booked
+    bookingForm.style.display = isBooked ? 'none' : 'block';
     
-    // Populate team selector
-    const teamSelect = document.getElementById('deskBookingTeam');
-    teamSelect.innerHTML = '<option value="">-- No team --</option>' + 
-        state.teams.map(team => 
-            `<option value="${team.id}" ${team.id === savedTeamId ? 'selected' : ''} style="color: ${team.color}">${team.name}</option>`
-        ).join('');
+    if (!isBooked) {
+        // Load saved name from localStorage
+        const savedName = localStorage.getItem('employeeName');
+        const savedEmail = localStorage.getItem('employeeEmail');
+        const savedTeamId = localStorage.getItem('employeeTeamId');
+        if (savedName) document.getElementById('employeeName').value = savedName;
+        if (savedEmail) document.getElementById('employeeEmail').value = savedEmail;
+        
+        // Populate team selector
+        const teamSelect = document.getElementById('deskBookingTeam');
+        teamSelect.innerHTML = '<option value="">-- No team --</option>' + 
+            state.teams.map(team => 
+                `<option value="${team.id}" ${team.id === savedTeamId ? 'selected' : ''} style="color: ${team.color}">${team.name}</option>`
+            ).join('');
+    }
     
     infoDiv.innerHTML = `
         <h3>${desk.name}</h3>
         <p>${location?.name || ''} ${desk.floor ? `• Floor ${desk.floor}` : ''} ${desk.zone ? `• ${desk.zone}` : ''}</p>
         <p class="booking-date">${new Date(deskState.selectedDate).toLocaleDateString('en-ZA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-        <p class="booking-type">Full Day Booking</p>
+        <p class="booking-type">${isBooked ? 'Currently Booked' : 'Full Day Booking'}</p>
     `;
     
     renderDeskBookingsList(deskId);
@@ -2761,6 +2840,7 @@ function openDeskBookingModal(deskId) {
 function closeDeskBookingModal() {
     document.getElementById('deskBookingModal').classList.remove('active');
     document.getElementById('deskBookingForm').reset();
+    document.getElementById('deskBookingForm').style.display = 'block'; // Reset form visibility
 }
 
 async function handleDeskBookingSubmit(e) {

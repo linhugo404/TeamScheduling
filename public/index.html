@@ -596,6 +596,61 @@
         </div>
     </div>
 
+    <!-- Wall Modal -->
+    <div id="wallModal" class="modal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2>Add Wall</h2>
+                <button class="modal-close" onclick="closeWallModal()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <form id="wallForm">
+                <input type="hidden" id="editWallId">
+                <div class="form-group">
+                    <label for="wallLength">Length (px)</label>
+                    <input type="number" id="wallLength" value="100" min="20" max="800">
+                </div>
+                <div class="form-group">
+                    <label for="wallThickness">Thickness (px)</label>
+                    <input type="number" id="wallThickness" value="6" min="2" max="20">
+                </div>
+                <div class="form-group">
+                    <label>Orientation</label>
+                    <div class="wall-orientation-options">
+                        <label class="orientation-option">
+                            <input type="radio" name="wallOrientation" value="0" checked>
+                            <span class="orientation-preview horizontal"></span>
+                            <span>Horizontal</span>
+                        </label>
+                        <label class="orientation-option">
+                            <input type="radio" name="wallOrientation" value="90">
+                            <span class="orientation-preview vertical"></span>
+                            <span>Vertical</span>
+                        </label>
+                        <label class="orientation-option">
+                            <input type="radio" name="wallOrientation" value="45">
+                            <span class="orientation-preview diagonal-down"></span>
+                            <span>Diagonal ↘</span>
+                        </label>
+                        <label class="orientation-option">
+                            <input type="radio" name="wallOrientation" value="-45">
+                            <span class="orientation-preview diagonal-up"></span>
+                            <span>Diagonal ↗</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeWallModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Wall</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Desk Booking Modal -->
     <div id="deskBookingModal" class="modal">
         <div class="modal-content">

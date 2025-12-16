@@ -115,6 +115,7 @@ CREATE TABLE IF NOT EXISTS floor_elements (
     y INTEGER DEFAULT 0,
     width INTEGER DEFAULT 100,
     height INTEGER DEFAULT 100,
+    rotation INTEGER DEFAULT 0, -- Rotation angle in degrees (for walls: 0=horizontal, 90=vertical, 45/-45=diagonal)
     points JSONB DEFAULT '[]'::jsonb,
     label TEXT DEFAULT '',
     color TEXT,

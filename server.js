@@ -789,7 +789,7 @@ app.get('/api/floor-elements', async (req, res) => {
 
 app.post('/api/floor-elements', async (req, res) => {
     try {
-        const { type, locationId, floor, x, y, width, height, points, label, color } = req.body;
+        const { type, locationId, floor, x, y, width, height, points, label, color, rotation } = req.body;
         
         if (!type || !locationId) {
             return res.status(400).json({ error: 'Type and location are required' });
@@ -804,6 +804,7 @@ app.post('/api/floor-elements', async (req, res) => {
             y: y || 0,
             width: width || 100,
             height: height || 100,
+            rotation: rotation || 0,
             points: points || [],
             label: label || '',
             color: color || null,
@@ -837,6 +838,7 @@ app.put('/api/floor-elements/:id', async (req, res) => {
         if (updates.y !== undefined) dbUpdates.y = updates.y;
         if (updates.width !== undefined) dbUpdates.width = updates.width;
         if (updates.height !== undefined) dbUpdates.height = updates.height;
+        if (updates.rotation !== undefined) dbUpdates.rotation = updates.rotation;
         if (updates.points) dbUpdates.points = updates.points;
         if (updates.label !== undefined) dbUpdates.label = updates.label;
         if (updates.color !== undefined) dbUpdates.color = updates.color;

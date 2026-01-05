@@ -1,3 +1,7 @@
+// Load environment variables from .env file (for local dev)
+// Render and other hosts set env vars directly
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const http = require('http');

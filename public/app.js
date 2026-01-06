@@ -14,7 +14,8 @@ let state = {
     viewers: [],
     myName: null,
     myUserId: null,
-    currentRoom: null
+    currentRoom: null,
+    weatherCache: {} // locationId -> { coords: {lat, lon}, forecast: [...], fetchedAt: Date }
 };
 
 // Socket.IO connection
@@ -48,6 +49,196 @@ async function init() {
     renderCalendar();
     updateCapacityDisplay();
     initSocket();
+    
+    // Fetch weather in background (don't block init)
+    fetchWeatherForLocation(state.currentLocation).then(() => {
+        renderCalendar(); // Re-render with weather
+    });
+}
+
+// ============================================
+// Weather Integration (Open-Meteo)
+// ============================================
+
+const WEATHER_ICONS = {
+    0: '☀️',   // Clear sky
+    1: '🌤️',  // Mainly clear
+    2: '⛅',   // Partly cloudy
+    3: '☁️',   // Overcast
+    45: '🌫️', // Fog
+    48: '🌫️', // Depositing rime fog
+    51: '🌧️', // Light drizzle
+    53: '🌧️', // Moderate drizzle
+    55: '🌧️', // Dense drizzle
+    56: '🌨️', // Light freezing drizzle
+    57: '🌨️', // Dense freezing drizzle
+    61: '🌧️', // Slight rain
+    63: '🌧️', // Moderate rain
+    65: '🌧️', // Heavy rain
+    66: '🌨️', // Light freezing rain
+    67: '🌨️', // Heavy freezing rain
+    71: '❄️',  // Slight snow
+    73: '❄️',  // Moderate snow
+    75: '❄️',  // Heavy snow
+    77: '❄️',  // Snow grains
+    80: '🌦️', // Slight rain showers
+    81: '🌦️', // Moderate rain showers
+    82: '🌧️', // Violent rain showers
+    85: '🌨️', // Slight snow showers
+    86: '🌨️', // Heavy snow showers
+    95: '⛈️', // Thunderstorm
+    96: '⛈️', // Thunderstorm with slight hail
+    99: '⛈️'  // Thunderstorm with heavy hail
+};
+
+async function geocodeAddress(address) {
+    if (!address) return null;
+    try {
+        const response = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`,
+            { headers: { 'User-Agent': 'OfficeBookingSystem/1.0' } }
+        );
+        const data = await response.json();
+        if (data && data.length > 0) {
+            return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+        }
+    } catch (error) {
+        console.error('Geocoding error:', error);
+    }
+    return null;
+}
+
+async function fetchWeatherForLocation(locationId) {
+    const location = state.locations.find(l => l.id === locationId);
+    if (!location || !location.address) return null;
+    
+    // Check cache (valid for 1 hour)
+    const cached = state.weatherCache[locationId];
+    if (cached && cached.fetchedAt && (Date.now() - cached.fetchedAt) < 3600000) {
+        return cached.forecast;
+    }
+    
+    // Get coordinates
+    let coords = cached?.coords;
+    if (!coords) {
+        coords = await geocodeAddress(location.address);
+        if (!coords) return null;
+    }
+    
+    try {
+        // Fetch 14-day forecast from Open-Meteo
+        const response = await fetch(
+            `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=14`
+        );
+        const data = await response.json();
+        
+        if (data && data.daily) {
+            const forecast = data.daily.time.map((date, i) => ({
+                date,
+                weatherCode: data.daily.weather_code[i],
+                tempMax: Math.round(data.daily.temperature_2m_max[i]),
+                tempMin: Math.round(data.daily.temperature_2m_min[i])
+            }));
+            
+            // Cache the result
+            state.weatherCache[locationId] = {
+                coords,
+                forecast,
+                fetchedAt: Date.now()
+            };
+            
+            return forecast;
+        }
+    } catch (error) {
+        console.error('Weather fetch error:', error);
+    }
+    return null;
+}
+
+function getWeatherIcon(weatherCode) {
+    return WEATHER_ICONS[weatherCode] || '🌡️';
+}
+
+const WEATHER_DESCRIPTIONS = {
+    0: 'Clear sky',
+    1: 'Mainly clear',
+    2: 'Partly cloudy',
+    3: 'Overcast',
+    45: 'Fog',
+    48: 'Depositing rime fog',
+    51: 'Light drizzle',
+    53: 'Moderate drizzle',
+    55: 'Dense drizzle',
+    56: 'Light freezing drizzle',
+    57: 'Dense freezing drizzle',
+    61: 'Slight rain',
+    63: 'Moderate rain',
+    65: 'Heavy rain',
+    66: 'Light freezing rain',
+    67: 'Heavy freezing rain',
+    71: 'Slight snow',
+    73: 'Moderate snow',
+    75: 'Heavy snow',
+    77: 'Snow grains',
+    80: 'Slight rain showers',
+    81: 'Moderate rain showers',
+    82: 'Violent rain showers',
+    85: 'Slight snow showers',
+    86: 'Heavy snow showers',
+    95: 'Thunderstorm',
+    96: 'Thunderstorm with slight hail',
+    99: 'Thunderstorm with heavy hail'
+};
+
+function getWeatherDescription(weatherCode) {
+    return WEATHER_DESCRIPTIONS[weatherCode] || 'Unknown';
+}
+
+function showWeatherTooltip(event, element) {
+    const code = parseInt(element.dataset.weatherCode);
+    const tempMax = element.dataset.tempMax;
+    const tempMin = element.dataset.tempMin;
+    const desc = getWeatherDescription(code);
+    const icon = getWeatherIcon(code);
+    
+    let tooltip = document.getElementById('weatherTooltip');
+    if (!tooltip) {
+        tooltip = document.createElement('div');
+        tooltip.id = 'weatherTooltip';
+        tooltip.className = 'weather-tooltip';
+        document.body.appendChild(tooltip);
+    }
+    
+    tooltip.innerHTML = `
+        <div class="weather-tooltip-icon">${icon}</div>
+        <div class="weather-tooltip-info">
+            <div class="weather-tooltip-desc">${desc}</div>
+            <div class="weather-tooltip-temps">
+                <span class="temp-high">↑ ${tempMax}°C</span>
+                <span class="temp-low">↓ ${tempMin}°C</span>
+            </div>
+        </div>
+    `;
+    
+    const rect = element.getBoundingClientRect();
+    tooltip.style.left = `${rect.left + rect.width / 2}px`;
+    tooltip.style.top = `${rect.top - 8}px`;
+    tooltip.classList.add('visible');
+}
+
+function hideWeatherTooltip() {
+    const tooltip = document.getElementById('weatherTooltip');
+    if (tooltip) {
+        tooltip.classList.remove('visible');
+    }
+}
+
+function getWeatherForDate(dateStr) {
+    const cached = state.weatherCache[state.currentLocation];
+    if (!cached || !cached.forecast) return null;
+    
+    const weather = cached.forecast.find(w => w.date === dateStr);
+    return weather;
 }
 
 // ============================================
@@ -259,6 +450,35 @@ function setupEventListeners() {
     document.getElementById('nextMonth').addEventListener('click', () => navigateMonth(1));
     document.getElementById('todayBtn').addEventListener('click', goToToday);
     
+    // Keyboard shortcuts for month navigation
+    document.addEventListener('keydown', (e) => {
+        // Don't trigger if user is typing in an input/textarea
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+            return;
+        }
+        
+        // Only when calendar view is active
+        if (!document.getElementById('calendarView').classList.contains('active')) {
+            return;
+        }
+        
+        switch(e.key) {
+            case 'ArrowLeft':
+                navigateMonth(-1);
+                e.preventDefault();
+                break;
+            case 'ArrowRight':
+                navigateMonth(1);
+                e.preventDefault();
+                break;
+            case 't':
+            case 'T':
+                goToToday();
+                e.preventDefault();
+                break;
+        }
+    });
+    
     // Location change
     elements.locationSelect.addEventListener('change', (e) => {
         state.currentLocation = e.target.value;
@@ -266,6 +486,11 @@ function setupEventListeners() {
         updateCapacityDisplay();
         renderTeamSelect();
         joinCurrentRoom();
+        
+        // Fetch weather for new location
+        fetchWeatherForLocation(state.currentLocation).then(() => {
+            renderCalendar();
+        });
         
         // Reload desks if desks view is active
         if (document.getElementById('desksView').classList.contains('active')) {
@@ -408,6 +633,19 @@ function renderCalendar() {
         
         let dayContent = `<span class="day-number">${day}</span>`;
         
+        // Weather icon (only for today and future dates within forecast range)
+        const weather = getWeatherForDate(dateStr);
+        const todayStr = formatDateStr(today);
+        if (weather && dateStr >= todayStr) {
+            const weatherDesc = getWeatherDescription(weather.weatherCode);
+            dayContent += `<span class="day-weather" 
+                data-weather-code="${weather.weatherCode}"
+                data-temp-max="${weather.tempMax}"
+                data-temp-min="${weather.tempMin}"
+                onmouseenter="showWeatherTooltip(event, this)"
+                onmouseleave="hideWeatherTooltip()">${getWeatherIcon(weather.weatherCode)}</span>`;
+        }
+        
         // Capacity indicator
         if (!isWeekend && !holiday && totalPeople > 0) {
             let capacityClass = '';
@@ -481,9 +719,22 @@ function renderCalendar() {
 }
 
 function navigateMonth(delta) {
+    const grid = elements.calendarGrid;
+    const animClass = delta > 0 ? 'slide-left' : 'slide-right';
+    
+    // Remove any existing animation class
+    grid.classList.remove('slide-left', 'slide-right');
+    
     state.currentDate.setMonth(state.currentDate.getMonth() + delta);
     renderCalendar();
     joinCurrentRoom();
+    
+    // Trigger animation
+    void grid.offsetWidth; // Force reflow
+    grid.classList.add(animClass);
+    
+    // Clean up after animation
+    setTimeout(() => grid.classList.remove(animClass), 200);
 }
 
 function goToToday() {

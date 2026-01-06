@@ -4,7 +4,9 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
+const compression = require('compression');
 const http = require('http');
+const path = require('path');
 const { Server } = require('socket.io');
 const { createClient } = require('@supabase/supabase-js');
 
@@ -107,8 +109,21 @@ io.on('connection', (socket) => {
 
 // Middleware
 app.use(cors());
+app.use(compression()); // Gzip compression for all responses
 app.use(express.json());
-app.use(express.static('public'));
+
+// Static files with caching headers
+app.use(express.static('public', {
+    maxAge: '1h', // Cache static assets for 1 hour
+    etag: true,
+    lastModified: true,
+    setHeaders: (res, filePath) => {
+        // Longer cache for immutable assets (if you add hashed filenames)
+        if (filePath.endsWith('.css') || filePath.endsWith('.js')) {
+            res.setHeader('Cache-Control', 'public, max-age=3600'); // 1 hour
+        }
+    }
+}));
 
 // Helper function to convert snake_case to camelCase
 function toCamelCase(obj) {

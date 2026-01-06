@@ -716,6 +716,113 @@ function renderCalendar() {
     }
     
     elements.calendarGrid.innerHTML = html;
+    
+    // Also render mobile list view
+    renderCalendarList(year, month, monthBookings, capacity, today);
+}
+
+function renderCalendarList(year, month, monthBookings, capacity, today) {
+    const listContainer = document.getElementById('calendarList');
+    if (!listContainer) return;
+    
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const totalDays = new Date(year, month + 1, 0).getDate();
+    const todayStr = formatDateStr(today);
+    
+    let listHtml = '';
+    
+    for (let day = 1; day <= totalDays; day++) {
+        const date = new Date(year, month, day);
+        const dateStr = formatDateStr(date);
+        const dayOfWeek = date.getDay();
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+        const isToday = date.toDateString() === today.toDateString();
+        const holiday = state.publicHolidays.find(h => h.date === dateStr);
+        
+        // Skip weekends in list view
+        if (isWeekend) continue;
+        
+        const dayBookings = monthBookings.filter(b => b.date === dateStr);
+        const totalPeople = dayBookings.reduce((sum, b) => sum + getBookingPeopleCount(b), 0);
+        
+        let classes = ['calendar-list-day'];
+        if (isToday) classes.push('today');
+        if (holiday) classes.push('holiday');
+        
+        // Capacity class
+        let capacityClass = '';
+        if (totalPeople >= capacity) capacityClass = 'full';
+        else if (totalPeople >= capacity * 0.8) capacityClass = 'warning';
+        
+        // Weather
+        const weather = getWeatherForDate(dateStr);
+        const weatherHtml = (weather && dateStr >= todayStr) 
+            ? `<span class="calendar-list-weather">${getWeatherIcon(weather.weatherCode)}</span>` 
+            : '';
+        
+        // Bookings HTML
+        let bookingsHtml = '';
+        if (holiday) {
+            bookingsHtml = `<div class="calendar-list-holiday">${holiday.name}</div>`;
+        } else if (dayBookings.length > 0) {
+            const sortedBookings = [...dayBookings].sort((a, b) => {
+                const teamA = state.teams.find(t => t.id === a.teamId);
+                const teamB = state.teams.find(t => t.id === b.teamId);
+                return (teamA?.name || '').localeCompare(teamB?.name || '');
+            });
+            
+            bookingsHtml = '<div class="calendar-list-bookings">';
+            sortedBookings.forEach(booking => {
+                const team = state.teams.find(t => t.id === booking.teamId);
+                const color = team ? team.color : '#6B7280';
+                const displayName = team ? team.name : booking.teamName;
+                const displayCount = team ? team.memberCount : booking.peopleCount;
+                const managerImage = team?.managerImage;
+                const managerName = team?.manager || '';
+                
+                // Avatar HTML
+                let avatarHtml = '';
+                if (managerImage) {
+                    avatarHtml = `<img src="${managerImage}" alt="${managerName}" class="calendar-list-booking-avatar">`;
+                } else {
+                    const initials = getInitials(managerName);
+                    avatarHtml = `<div class="calendar-list-booking-avatar" style="background: ${color}">${initials}</div>`;
+                }
+                
+                bookingsHtml += `
+                    <div class="calendar-list-booking" onclick="openBookingModal('${dateStr}')">
+                        ${avatarHtml}
+                        <div class="calendar-list-booking-color" style="background: ${color}"></div>
+                        <div class="calendar-list-booking-info">
+                            <span class="calendar-list-booking-team">${displayName}</span>
+                            <span class="calendar-list-booking-count">${displayCount} people</span>
+                        </div>
+                    </div>
+                `;
+            });
+            bookingsHtml += '</div>';
+        } else {
+            bookingsHtml = `<div class="calendar-list-empty" onclick="openBookingModal('${dateStr}')">No bookings - tap to add</div>`;
+        }
+        
+        listHtml += `
+            <div class="${classes.join(' ')}">
+                <div class="calendar-list-header" onclick="openBookingModal('${dateStr}')">
+                    <div class="calendar-list-date">
+                        <span class="calendar-list-day-num">${day}</span>
+                        <span class="calendar-list-day-name">${dayNames[dayOfWeek]}</span>
+                    </div>
+                    <div class="calendar-list-meta">
+                        ${weatherHtml}
+                        ${!holiday ? `<span class="calendar-list-capacity ${capacityClass}">${totalPeople}/${capacity}</span>` : ''}
+                    </div>
+                </div>
+                ${bookingsHtml}
+            </div>
+        `;
+    }
+    
+    listContainer.innerHTML = listHtml;
 }
 
 function navigateMonth(delta) {

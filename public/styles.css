@@ -576,6 +576,165 @@ body::before {
     overflow: hidden;
 }
 
+/* Mobile List View (hidden on desktop) */
+.calendar-list {
+    display: none;
+}
+
+.calendar-list-day {
+    background: var(--bg-card);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+}
+
+.calendar-list-day.weekend {
+    opacity: 0.6;
+}
+
+.calendar-list-day.holiday {
+    border-left: 3px solid var(--danger);
+}
+
+.calendar-list-day.today {
+    border-left: 3px solid var(--accent-primary);
+}
+
+.calendar-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--bg-tertiary);
+    cursor: pointer;
+}
+
+.calendar-list-date {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.calendar-list-day-num {
+    font-size: 1.25rem;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-primary);
+}
+
+.calendar-list-day.today .calendar-list-day-num {
+    color: var(--accent-primary);
+}
+
+.calendar-list-day-name {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.calendar-list-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.calendar-list-capacity {
+    font-size: 0.75rem;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-muted);
+    background: var(--bg-secondary);
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+}
+
+.calendar-list-capacity.warning {
+    color: var(--warning);
+    background: rgba(245, 158, 11, 0.1);
+}
+
+.calendar-list-capacity.full {
+    color: var(--danger);
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.calendar-list-weather {
+    font-size: 1rem;
+}
+
+.calendar-list-holiday {
+    font-size: 0.75rem;
+    color: var(--danger);
+    padding: var(--spacing-xs) var(--spacing-md);
+    background: rgba(229, 57, 53, 0.1);
+}
+
+.calendar-list-bookings {
+    padding: var(--spacing-sm) var(--spacing-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.calendar-list-booking {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+}
+
+.calendar-list-booking-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    object-fit: cover;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: white;
+}
+
+.calendar-list-booking-avatar img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.calendar-list-booking-color {
+    width: 4px;
+    height: 24px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+.calendar-list-booking-info {
+    flex: 1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.calendar-list-booking-team {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.calendar-list-booking-count {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.calendar-list-empty {
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
 .calendar-header {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
@@ -2183,43 +2342,31 @@ form {
     }
     
     .calendar-day {
-        min-height: 60px;
+        min-height: 70px;
         padding: var(--spacing-xs);
     }
     
     .day-number {
-        font-size: 0.8rem;
+        font-size: 0.85rem;
+        font-weight: 600;
     }
     
     .day-capacity {
-        font-size: 0.6rem;
+        font-size: 0.55rem;
         padding: 2px 4px;
+        top: 2px;
+        right: 2px;
     }
     
-    .day-bookings-preview {
+    /* Hide calendar grid on mobile, show list view */
+    .calendar-container {
         display: none;
     }
     
-    /* Show compact booking indicators on mobile */
-    .calendar-day:not(.other-month):not(.weekend):not(.holiday)::after {
-        content: attr(data-booking-count);
-        position: absolute;
-        bottom: 4px;
-        right: 4px;
-        font-size: 0.6rem;
-        background: var(--accent-primary);
-        color: white;
-        width: 16px;
-        height: 16px;
-        border-radius: 50%;
+    .calendar-list {
         display: flex;
-        align-items: center;
-        justify-content: center;
-        opacity: 0;
-    }
-    
-    .calendar-day[data-booking-count]:not([data-booking-count="0"])::after {
-        opacity: 1;
+        flex-direction: column;
+        gap: var(--spacing-sm);
     }
     
     /* Teams grid */

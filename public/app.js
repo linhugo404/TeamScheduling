@@ -27,7 +27,6 @@ const elements = {
     capacityFill: document.getElementById('capacityFill'),
     currentMonth: document.getElementById('currentMonth'),
     calendarGrid: document.getElementById('calendarGrid'),
-    teamsLegend: document.getElementById('teamsLegend'),
     bookingModal: document.getElementById('bookingModal'),
     bookingForm: document.getElementById('bookingForm'),
     teamSelect: document.getElementById('teamSelect'),
@@ -232,7 +231,6 @@ async function loadData() {
         
         renderLocationSelect();
         renderTeamSelect();
-        renderTeamsLegend();
         renderTeamsList();
         renderLocationsList();
         renderHolidaysList();
@@ -248,10 +246,13 @@ async function loadData() {
 // ============================================
 
 function setupEventListeners() {
-    // Navigation
-    document.querySelectorAll('.nav-item').forEach(item => {
+    // Navigation - skip submenu toggles (items without data-view)
+    document.querySelectorAll('.nav-item[data-view]').forEach(item => {
         item.addEventListener('click', () => switchView(item.dataset.view));
     });
+    
+    // Settings submenu toggle
+    setupSettingsSubmenu();
     
     // Month navigation
     document.getElementById('prevMonth').addEventListener('click', () => navigateMonth(-1));
@@ -263,7 +264,6 @@ function setupEventListeners() {
         state.currentLocation = e.target.value;
         renderCalendar();
         updateCapacityDisplay();
-        renderTeamsLegend();
         renderTeamSelect();
         joinCurrentRoom();
         
@@ -814,28 +814,16 @@ function renderTeamLocationSelect() {
     }
 }
 
-function renderTeamsLegend() {
-    const container = elements.teamsLegend;
-    // Filter teams by current location and sort alphabetically
-    const locationTeams = state.teams
-        .filter(t => t.locationId === state.currentLocation)
-        .sort((a, b) => a.name.localeCompare(b.name));
+function setupSettingsSubmenu() {
+    const settingsToggle = document.getElementById('settingsToggle');
+    const settingsSubmenu = document.getElementById('settingsSubmenu');
     
-    if (locationTeams.length === 0) {
-        container.innerHTML = `<h4>Teams</h4><p style="font-size: 0.8rem; color: var(--text-muted);">No teams for this location</p>`;
-        return;
+    if (settingsToggle && settingsSubmenu) {
+        settingsToggle.addEventListener('click', () => {
+            settingsToggle.classList.toggle('expanded');
+            settingsSubmenu.classList.toggle('open');
+        });
     }
-    
-    const legendItems = locationTeams.slice(0, 8).map(team => `
-        <div class="team-legend-item">
-            <span class="team-color-dot" style="background: ${team.color}"></span>
-            <span>${team.name} (${team.memberCount || 0})</span>
-        </div>
-    `).join('');
-    
-    const moreCount = locationTeams.length > 8 ? `<p style="font-size: 0.75rem; color: var(--text-muted);">+${locationTeams.length - 8} more</p>` : '';
-    
-    container.innerHTML = `<h4>Teams</h4>${legendItems}${moreCount}`;
 }
 
 function renderTeamsList() {
@@ -1157,7 +1145,6 @@ async function handleTeamSubmit(e) {
         
         await loadData();
         renderTeamsList();
-        renderTeamsLegend();
         renderTeamSelect();
         renderCalendar();
         updateCapacityDisplay();
@@ -1260,7 +1247,6 @@ async function deleteTeam(id) {
         
         await loadData();
         renderTeamsList();
-        renderTeamsLegend();
         renderTeamSelect();
         renderCalendar();
         updateCapacityDisplay();

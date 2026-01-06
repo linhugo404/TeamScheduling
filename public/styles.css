@@ -300,36 +300,49 @@ body::before {
     border: 1px solid rgba(217, 92, 2, 0.3);
 }
 
-/* Teams Legend */
-.teams-legend {
-    margin-top: auto;
-    padding-top: var(--spacing-lg);
-    border-top: 1px solid var(--border-color);
-}
-
-.teams-legend h4 {
-    font-size: 0.75rem;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--text-muted);
-    margin-bottom: var(--spacing-md);
-}
-
-.team-legend-item {
+/* Settings Submenu */
+.nav-item-group {
     display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-xs) 0;
-    font-size: 0.85rem;
-    color: var(--text-secondary);
+    flex-direction: column;
 }
 
-.team-color-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    flex-shrink: 0;
+.nav-item.has-submenu {
+    justify-content: flex-start;
+    width: 100%;
+}
+
+.nav-item.has-submenu .submenu-arrow {
+    width: 16px;
+    height: 16px;
+    margin-left: auto;
+    transition: transform var(--transition-fast);
+}
+
+.nav-item.has-submenu.expanded .submenu-arrow {
+    transform: rotate(180deg);
+}
+
+.nav-submenu {
+    display: none;
+    flex-direction: column;
+    padding-left: var(--spacing-md);
+    margin-top: var(--spacing-xs);
+    border-left: 2px solid var(--border-color);
+    margin-left: var(--spacing-lg);
+}
+
+.nav-submenu.open {
+    display: flex;
+}
+
+.nav-subitem {
+    padding: var(--spacing-xs) var(--spacing-md);
+    font-size: 0.9rem;
+}
+
+.nav-subitem svg {
+    width: 18px;
+    height: 18px;
 }
 
 /* ============================================
@@ -1939,8 +1952,7 @@ form {
     .logo span,
     .location-selector label,
     .capacity-header span:first-child,
-    .nav-item span,
-    .teams-legend {
+    .nav-item span {
         display: none;
     }
     
@@ -1996,8 +2008,7 @@ form {
     .sidebar .logo span,
     .sidebar .location-selector label,
     .sidebar .capacity-header span:first-child,
-    .sidebar .nav-item span,
-    .sidebar .teams-legend {
+    .sidebar .nav-item span {
         display: block;
     }
     

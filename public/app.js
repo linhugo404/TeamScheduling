@@ -421,11 +421,18 @@ function renderCalendar() {
             dayContent += `<span class="holiday-label">${holiday.name}</span>`;
         }
         
-        // Booking chips with drag & drop
+        // Booking chips with drag & drop (sorted by team name)
         if (!isWeekend && !holiday && dayBookings.length > 0) {
             dayContent += '<div class="day-bookings-preview">';
-            const maxShow = 3;
-            dayBookings.slice(0, maxShow).forEach(booking => {
+            const maxShow = 5;
+            const sortedDayBookings = [...dayBookings].sort((a, b) => {
+                const teamA = state.teams.find(t => t.id === a.teamId);
+                const teamB = state.teams.find(t => t.id === b.teamId);
+                const nameA = teamA ? teamA.name : a.teamName || '';
+                const nameB = teamB ? teamB.name : b.teamName || '';
+                return nameA.localeCompare(nameB);
+            });
+            sortedDayBookings.slice(0, maxShow).forEach(booking => {
                 const team = state.teams.find(t => t.id === booking.teamId);
                 const color = team ? team.color : '#6B7280';
                 const teamId = team ? team.id : '';
@@ -447,8 +454,8 @@ function renderCalendar() {
                     </div>
                 `;
             });
-            if (dayBookings.length > maxShow) {
-                dayContent += `<span class="more-bookings">+${dayBookings.length - maxShow} more</span>`;
+            if (sortedDayBookings.length > maxShow) {
+                dayContent += `<span class="more-bookings">+${sortedDayBookings.length - maxShow} more</span>`;
             }
             dayContent += '</div>';
         }
@@ -579,7 +586,16 @@ function renderDayBookings(dateStr) {
         return;
     }
     
-    container.innerHTML = dayBookings.map(booking => {
+    // Sort bookings by team name alphabetically
+    const sortedBookings = [...dayBookings].sort((a, b) => {
+        const teamA = state.teams.find(t => t.id === a.teamId);
+        const teamB = state.teams.find(t => t.id === b.teamId);
+        const nameA = teamA ? teamA.name : a.teamName || '';
+        const nameB = teamB ? teamB.name : b.teamName || '';
+        return nameA.localeCompare(nameB);
+    });
+    
+    container.innerHTML = sortedBookings.map(booking => {
         const team = state.teams.find(t => t.id === booking.teamId);
         const color = team ? team.color : '#6B7280';
         const location = state.locations.find(l => l.id === booking.locationId);
@@ -767,14 +783,17 @@ function updateCapacityDisplay() {
 // ============================================
 
 function renderLocationSelect() {
-    elements.locationSelect.innerHTML = state.locations.map(loc => 
+    const sortedLocations = [...state.locations].sort((a, b) => a.name.localeCompare(b.name));
+    elements.locationSelect.innerHTML = sortedLocations.map(loc => 
         `<option value="${loc.id}" ${loc.id === state.currentLocation ? 'selected' : ''}>${loc.name}</option>`
     ).join('');
 }
 
 function renderTeamSelect() {
-    // Filter teams by current location
-    const locationTeams = state.teams.filter(t => t.locationId === state.currentLocation);
+    // Filter teams by current location and sort alphabetically
+    const locationTeams = state.teams
+        .filter(t => t.locationId === state.currentLocation)
+        .sort((a, b) => a.name.localeCompare(b.name));
     
     if (locationTeams.length === 0) {
         elements.teamSelect.innerHTML = '<option value="">No teams for this location</option>';
@@ -788,7 +807,8 @@ function renderTeamSelect() {
 function renderTeamLocationSelect() {
     const select = document.getElementById('teamLocationSelect');
     if (select) {
-        select.innerHTML = state.locations.map(loc => 
+        const sortedLocations = [...state.locations].sort((a, b) => a.name.localeCompare(b.name));
+        select.innerHTML = sortedLocations.map(loc => 
             `<option value="${loc.id}">${loc.name}</option>`
         ).join('');
     }
@@ -796,8 +816,10 @@ function renderTeamLocationSelect() {
 
 function renderTeamsLegend() {
     const container = elements.teamsLegend;
-    // Filter teams by current location
-    const locationTeams = state.teams.filter(t => t.locationId === state.currentLocation);
+    // Filter teams by current location and sort alphabetically
+    const locationTeams = state.teams
+        .filter(t => t.locationId === state.currentLocation)
+        .sort((a, b) => a.name.localeCompare(b.name));
     
     if (locationTeams.length === 0) {
         container.innerHTML = `<h4>Teams</h4><p style="font-size: 0.8rem; color: var(--text-muted);">No teams for this location</p>`;
@@ -829,8 +851,12 @@ function renderTeamsList() {
     
     let html = '';
     
-    state.locations.forEach(location => {
-        const locationTeams = teamsByLocation[location.id] || [];
+    // Sort locations alphabetically
+    const sortedLocations = [...state.locations].sort((a, b) => a.name.localeCompare(b.name));
+    
+    sortedLocations.forEach(location => {
+        const locationTeams = (teamsByLocation[location.id] || [])
+            .sort((a, b) => a.name.localeCompare(b.name)); // Sort teams alphabetically
         if (locationTeams.length === 0) return;
         
         html += `<div class="teams-location-group">
@@ -898,7 +924,8 @@ function getInitials(name) {
 
 function renderLocationsList() {
     const container = document.getElementById('locationsList');
-    container.innerHTML = state.locations.map(loc => {
+    const sortedLocations = [...state.locations].sort((a, b) => a.name.localeCompare(b.name));
+    container.innerHTML = sortedLocations.map(loc => {
         const hasAddress = loc.address && loc.address.trim();
         const mapsLink = hasAddress
             ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc.address)}`
@@ -1392,8 +1419,10 @@ function renderHolidaysList() {
     
     let html = '';
     Object.keys(byYear).sort().reverse().forEach(year => {
+        // Sort holidays by date within each year
+        const sortedHolidays = byYear[year].sort((a, b) => a.date.localeCompare(b.date));
         html += `<div class="holidays-year-group"><h3>${year}</h3><div class="holidays-list">`;
-        byYear[year].forEach(holiday => {
+        sortedHolidays.forEach(holiday => {
             const date = new Date(holiday.date);
             const formattedDate = date.toLocaleDateString('en-ZA', { 
                 weekday: 'short', 
@@ -1823,10 +1852,11 @@ function initDesksView() {
         desksViewInitialized = true;
     }
     
-    // Populate assigned team dropdown
+    // Populate assigned team dropdown (sorted alphabetically)
     const teamSelect = document.getElementById('assignedTeamId');
     if (teamSelect) {
-        teamSelect.innerHTML = state.teams.map(t => 
+        const sortedTeams = [...state.teams].sort((a, b) => a.name.localeCompare(b.name));
+        teamSelect.innerHTML = sortedTeams.map(t => 
             `<option value="${t.id}">${t.name}</option>`
         ).join('');
     }
@@ -2743,13 +2773,15 @@ function openDeskModal(deskId = null) {
     const assignedTeamGroup = document.getElementById('assignedTeamGroup');
     const assignedTeamSelect = document.getElementById('assignedTeamId');
     
-    // Populate location select with current location selected
-    locationInput.innerHTML = state.locations.map(loc => 
+    // Populate location select with current location selected (sorted alphabetically)
+    const sortedLocations = [...state.locations].sort((a, b) => a.name.localeCompare(b.name));
+    locationInput.innerHTML = sortedLocations.map(loc => 
         `<option value="${loc.id}" ${loc.id === state.currentLocation ? 'selected' : ''}>${loc.name}</option>`
     ).join('');
     
-    // Populate team select
-    assignedTeamSelect.innerHTML = state.teams.map(t => 
+    // Populate team select (sorted alphabetically)
+    const sortedTeams = [...state.teams].sort((a, b) => a.name.localeCompare(b.name));
+    assignedTeamSelect.innerHTML = sortedTeams.map(t => 
         `<option value="${t.id}">${t.name}</option>`
     ).join('');
     
@@ -3098,10 +3130,11 @@ function openDeskBookingModal(deskId) {
         if (savedName) document.getElementById('employeeName').value = savedName;
         if (savedEmail) document.getElementById('employeeEmail').value = savedEmail;
         
-        // Populate team selector
+        // Populate team selector (sorted alphabetically)
         const teamSelect = document.getElementById('deskBookingTeam');
+        const sortedTeams = [...state.teams].sort((a, b) => a.name.localeCompare(b.name));
         teamSelect.innerHTML = '<option value="">-- No team --</option>' + 
-            state.teams.map(team => 
+            sortedTeams.map(team => 
                 `<option value="${team.id}" ${team.id === savedTeamId ? 'selected' : ''} style="color: ${team.color}">${team.name}</option>`
             ).join('');
     }

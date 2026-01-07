@@ -184,7 +184,8 @@ function toggleEditMode() {
 
 function renderFloorMap() {
     const container = document.getElementById('floorMap');
-    const myName = localStorage.getItem('employeeName') || '';
+    // Use Azure AD logged-in user name, fallback to localStorage
+    const myName = window.currentUser?.name || localStorage.getItem('employeeName') || '';
     
     let html = '';
     
@@ -451,14 +452,14 @@ function handleDeskClick(deskId) {
         }
     }
     
-    // Check if user has saved their info
-    const savedName = localStorage.getItem('employeeName');
+    // Use Azure AD user if logged in, otherwise check localStorage
+    const userName = window.currentUser?.name || localStorage.getItem('employeeName');
     
-    if (savedName) {
-        // Quick book with saved info
+    if (userName) {
+        // Quick book with user info
         quickBookDesk(desk);
     } else {
-        // First time - show quick setup modal
+        // No user info - show quick setup modal
         showQuickBookModal(desk);
     }
 }
@@ -467,8 +468,9 @@ function handleDeskClick(deskId) {
 function showBookingInfoPopup(desk, booking) {
     const location = state.locations.find(l => l.id === desk.locationId);
     const team = booking.teamId ? state.teams.find(t => t.id === booking.teamId) : null;
-    const savedName = localStorage.getItem('employeeName');
-    const isOwnBooking = savedName && booking.employeeName.toLowerCase() === savedName.toLowerCase();
+    // Use Azure AD user name or localStorage
+    const currentUserName = window.currentUser?.name || localStorage.getItem('employeeName');
+    const isOwnBooking = currentUserName && booking.employeeName.toLowerCase() === currentUserName.toLowerCase();
     
     const popup = document.createElement('div');
     popup.className = 'desk-info-popup';
@@ -529,10 +531,11 @@ function showBookingInfoPopup(desk, booking) {
     document.addEventListener('keydown', handleEsc);
 }
 
-// Quick book a desk with saved info
+// Quick book a desk with user info (Azure AD or localStorage)
 async function quickBookDesk(desk) {
-    const savedName = localStorage.getItem('employeeName');
-    const savedEmail = localStorage.getItem('employeeEmail') || '';
+    // Prefer Azure AD user info over localStorage
+    const savedName = window.currentUser?.name || localStorage.getItem('employeeName');
+    const savedEmail = window.currentUser?.email || localStorage.getItem('employeeEmail') || '';
     const savedTeamId = localStorage.getItem('employeeTeamId') || null;
     
     // Show loading state on desk
@@ -570,9 +573,11 @@ async function quickBookDesk(desk) {
     }
 }
 
-// Show quick book modal for first-time users
+// Show quick book modal for users without saved info
 function showQuickBookModal(desk) {
     const savedTeamId = localStorage.getItem('employeeTeamId');
+    // Pre-fill with any available info
+    const prefillName = window.currentUser?.name || localStorage.getItem('employeeName') || '';
     
     const popup = document.createElement('div');
     popup.className = 'desk-info-popup';
@@ -582,11 +587,11 @@ function showQuickBookModal(desk) {
             <div class="popup-header">
                 <h3>Book ${desk.name}</h3>
             </div>
-            <p class="popup-hint">Enter your name to book this desk. Your info will be saved for quick booking next time.</p>
+            <p class="popup-hint">Please sign in with Azure AD for automatic booking, or enter your name below.</p>
             <form id="quickBookForm" class="quick-book-form">
                 <input type="hidden" id="quickBookDeskId" value="${desk.id}">
                 <div class="form-group">
-                    <input type="text" id="quickBookName" required placeholder="Your name" autofocus>
+                    <input type="text" id="quickBookName" required placeholder="Your name" value="${prefillName}" autofocus>
                 </div>
                 <div class="form-group">
                     <select id="quickBookTeam">
@@ -1384,9 +1389,9 @@ function openDeskBookingModal(deskId) {
     bookingForm.style.display = isBooked ? 'none' : 'block';
     
     if (!isBooked) {
-        // Load saved name from localStorage
-        const savedName = localStorage.getItem('employeeName');
-        const savedEmail = localStorage.getItem('employeeEmail');
+        // Use Azure AD user info or localStorage
+        const savedName = window.currentUser?.name || localStorage.getItem('employeeName');
+        const savedEmail = window.currentUser?.email || localStorage.getItem('employeeEmail');
         const savedTeamId = localStorage.getItem('employeeTeamId');
         if (savedName) document.getElementById('employeeName').value = savedName;
         if (savedEmail) document.getElementById('employeeEmail').value = savedEmail;
@@ -1554,4 +1559,31 @@ function showDeskQR(deskId) {
 
 // Mark module as loaded
 window.floorPlanLoaded = true;
+
+// Expose functions globally for main.js to call
+window.initDesksView = initDesksView;
+window.loadDesks = loadDesks;
+window.updateFloorSelector = updateFloorSelector;
+window.toggleEditMode = toggleEditMode;
+window.openDeskModal = openDeskModal;
+window.closeDeskModal = closeDeskModal;
+window.handleDeskClick = handleDeskClick;
+window.selectElement = selectElement;
+window.deleteSelectedElement = deleteSelectedElement;
+window.handleFloorElementClick = handleFloorElementClick;
+window.quickBookDesk = quickBookDesk;
+window.showQuickBookModal = showQuickBookModal;
+window.cancelBookingFromPopup = cancelBookingFromPopup;
+window.cancelDeskBooking = cancelDeskBooking;
+window.deleteDesk = deleteDesk;
+window.openRoomModal = openRoomModal;
+window.closeRoomModal = closeRoomModal;
+window.openWallModal = openWallModal;
+window.closeWallModal = closeWallModal;
+window.openLabelModal = openLabelModal;
+window.closeLabelModal = closeLabelModal;
+window.openDeskBookingModal = openDeskBookingModal;
+window.closeDeskBookingModal = closeDeskBookingModal;
+window.showDeskQR = showDeskQR;
+
 console.log('Floor plan module loaded');

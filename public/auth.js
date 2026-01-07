@@ -305,8 +305,9 @@ async function fetchDirectReportsCount(userId) {
     if (!token) return 0;
     
     try {
+        // Fetch all direct reports (we need to count them)
         const response = await fetch(
-            `${graphConfig.graphUsersEndpoint}/${userId}/directReports?$count=true&$top=0`,
+            `${graphConfig.graphUsersEndpoint}/${userId}/directReports?$select=id`,
             {
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -317,7 +318,7 @@ async function fetchDirectReportsCount(userId) {
         
         if (response.ok) {
             const data = await response.json();
-            return data['@odata.count'] || data.value?.length || 0;
+            return data.value?.length || 0;
         }
     } catch (error) {
         console.error('Failed to fetch direct reports:', error);
@@ -367,8 +368,10 @@ async function onUserAuthenticated(account) {
         department: profile?.department
     };
     
-    // Store user info
+    // Store user info globally and in localStorage for persistence
     window.currentUser = user;
+    localStorage.setItem('employeeName', user.name);
+    localStorage.setItem('employeeEmail', user.email);
     
     // Update UI
     showUserUI(user);
@@ -451,4 +454,12 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error('MSAL library not loaded');
     }
 });
+
+// Expose Azure AD functions globally for use by other modules
+window.fetchAllJobTitles = fetchAllJobTitles;
+window.fetchUsersByJobTitles = fetchUsersByJobTitles;
+window.fetchUserPhotoById = fetchUserPhotoById;
+window.fetchDirectReportsCount = fetchDirectReportsCount;
+window.isAuthenticated = isAuthenticated;
+window.getCurrentUser = getCurrentUser;
 

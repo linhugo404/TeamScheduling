@@ -9,6 +9,16 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Inline theme detection to prevent flash of wrong theme -->
+    <script>
+        (function() {
+            var saved = localStorage.getItem('theme');
+            if (!saved) {
+                saved = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+            }
+            document.documentElement.setAttribute('data-theme', saved);
+        })();
+    </script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
@@ -395,7 +405,7 @@
                 <header class="view-header">
                     <h1>Public Holidays</h1>
                     <div class="holiday-actions">
-                        <select id="holidayYear" class="year-select">
+                        <select id="holidayYearSelect" class="year-select">
                             <!-- Populated by JS -->
                         </select>
                         <button id="fetchHolidaysBtn" class="btn btn-primary">
@@ -482,7 +492,7 @@
                 
                 <div class="form-group" id="teamMemberInfo">
                     <label>Team Info</label>
-                    <div id="teamMemberCount" class="selected-date"></div>
+                    <div id="bookingTeamInfo" class="selected-date"></div>
                 </div>
                 
                 <div class="form-group">
@@ -529,10 +539,10 @@
                 </button>
             </div>
             <form id="teamForm">
-                <input type="hidden" id="editTeamId">
+                <input type="hidden" id="teamId">
                 <div class="form-group">
-                    <label for="teamLocationSelect">Office Location</label>
-                    <select id="teamLocationSelect" required>
+                    <label for="teamLocation">Office Location</label>
+                    <select id="teamLocation" required>
                         <!-- Populated dynamically -->
                     </select>
                 </div>
@@ -574,8 +584,8 @@
                     <span class="hint">Auto-populated when selecting from Azure AD</span>
                 </div>
                 <div class="form-group">
-                    <label for="teamMemberCountInput">Number of Team Members</label>
-                    <input type="number" id="teamMemberCountInput" min="0" max="50" value="1" required>
+                    <label for="teamMemberCount">Number of Team Members</label>
+                    <input type="number" id="teamMemberCount" min="0" max="50" value="1" required>
                     <span id="memberCountHint" class="hint" style="display:none"></span>
                 </div>
                 <div class="form-group">
@@ -889,7 +899,7 @@
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="app.js"></script>
+    <script type="module" src="js/main.js"></script>
 </body>
 </html>
 

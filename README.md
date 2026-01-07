@@ -45,10 +45,11 @@ A modern, beautiful web application for managing office space bookings and desk 
 
 ### 🎨 User Experience
 - **Modern UI** - Beautiful Digiata-inspired dark theme with orange accents
-- **Dark/Light Mode** - Toggle between themes with preference saved
-- **Responsive Design** - Desktop calendar grid, mobile list view
-- **Smooth Animations** - Fluid month navigation transitions
+- **Dark/Light Mode** - Auto-detects system preference, with manual override option
+- **Responsive Design** - Desktop calendar grid (>768px), mobile list view (≤768px), hamburger menu (≤1024px)
+- **Smooth Animations** - Fluid month navigation transitions with optimistic UI updates
 - **Blueprint-Style Floor Plans** - Professional office layout visualization
+- **Drag & Drop** - Reschedule bookings with instant visual feedback
 
 ## Quick Start
 
@@ -219,7 +220,7 @@ The app integrates with Azure AD to automatically populate team information:
 2. Use the **time slider** to see availability
 3. Click on an available desk (blue)
 4. Select your time range
-5. Enter your name and team
+5. If signed in via Azure AD, your name is auto-filled; otherwise enter manually
 6. Click **Book Desk**
 
 ### QR Code Check-In
@@ -276,9 +277,24 @@ TeamScheduling/
 ├── public/
 │   ├── index.html         # Main HTML page
 │   ├── styles.css         # Styling (dark/light themes)
-│   ├── app.js             # Frontend JavaScript
 │   ├── auth.js            # Azure AD authentication (MSAL.js)
-│   └── checkin.html       # QR code check-in page
+│   ├── floor-plan.js      # Floor plan editor and desk booking
+│   ├── checkin.html       # QR code check-in page
+│   └── js/                # Modular ES6 JavaScript
+│       ├── main.js        # App entry point and initialization
+│       ├── state.js       # Centralized state management
+│       ├── api.js         # API calls to backend
+│       ├── calendar.js    # Calendar rendering (grid & list views)
+│       ├── bookings.js    # Booking modal and CRUD operations
+│       ├── teams.js       # Team management
+│       ├── locations.js   # Location management
+│       ├── holidays.js    # Public holidays
+│       ├── dragdrop.js    # Drag and drop functionality
+│       ├── theme.js       # Theme management (auto-detect system)
+│       ├── socket.js      # Real-time Socket.IO handling
+│       ├── views.js       # View switching logic
+│       ├── utils.js       # Utility functions
+│       └── azure-managers.js  # Azure AD manager selection
 └── README.md
 ```
 

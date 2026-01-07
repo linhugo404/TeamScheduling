@@ -59,11 +59,13 @@ export function getInitials(name) {
  * Generate avatar HTML (image or initials)
  */
 export function getAvatarHTML(managerName, imageUrl, color, className = '') {
+    const safeName = escapeHtml(managerName || '');
+    const safeColor = escapeHtml(color || '#6B7280');
     if (imageUrl) {
-        return `<img src="${imageUrl}" alt="${managerName}" class="${className}" loading="lazy">`;
+        return `<img src="${imageUrl}" alt="${safeName}" class="${className}" loading="lazy">`;
     }
     const initials = getInitials(managerName);
-    return `<div class="${className}" style="background: ${color}; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600;">${initials}</div>`;
+    return `<div class="${className}" style="background: ${safeColor}; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600;">${initials}</div>`;
 }
 
 /**

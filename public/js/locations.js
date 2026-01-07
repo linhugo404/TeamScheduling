@@ -4,7 +4,7 @@
  */
 
 import { state, elements } from './state.js';
-import { showToast } from './utils.js';
+import { showToast, escapeHtml } from './utils.js';
 import { createLocation, updateLocation, deleteLocationApi } from './api.js';
 import { renderTeamSelect } from './teams.js';
 
@@ -17,7 +17,7 @@ export function renderLocationSelect() {
     
     const sortedLocations = [...state.locations].sort((a, b) => a.name.localeCompare(b.name));
     select.innerHTML = sortedLocations.map(loc => 
-        `<option value="${loc.id}" ${loc.id === state.currentLocation ? 'selected' : ''}>${loc.name}</option>`
+        `<option value="${escapeHtml(loc.id)}" ${loc.id === state.currentLocation ? 'selected' : ''}>${escapeHtml(loc.name)}</option>`
     ).join('');
 }
 
@@ -45,15 +45,15 @@ export function renderLocationsList() {
                     </svg>
                 </div>
                 <div class="location-card-info">
-                    <h4>${loc.name}</h4>
+                    <h4>${escapeHtml(loc.name)}</h4>
                     <span class="location-capacity">${loc.capacity} people capacity</span>
                 </div>
             </div>
-            ${loc.address ? `<div class="location-detail"><span>Address:</span> ${loc.address}</div>` : ''}
+            ${loc.address ? `<div class="location-detail"><span>Address:</span> ${escapeHtml(loc.address)}</div>` : ''}
             ${loc.floors > 1 ? `<div class="location-detail"><span>Floors:</span> ${loc.floors}</div>` : ''}
             <div class="location-card-actions">
-                <button class="btn btn-sm" onclick="editLocation('${loc.id}')">Edit</button>
-                <button class="btn btn-sm btn-danger" onclick="deleteLocation('${loc.id}')">Delete</button>
+                <button class="btn btn-sm" onclick="editLocation('${escapeHtml(loc.id)}')">Edit</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteLocation('${escapeHtml(loc.id)}')">Delete</button>
             </div>
         </div>
     `).join('');

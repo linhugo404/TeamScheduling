@@ -4,7 +4,7 @@
  */
 
 import { state } from './state.js';
-import { showToast } from './utils.js';
+import { showToast, escapeHtml } from './utils.js';
 import { fetchHolidaysFromApi, saveHolidays, deleteHolidayApi } from './api.js';
 import { renderCalendar } from './calendar.js';
 
@@ -63,9 +63,9 @@ export function renderHolidaysList() {
             <div class="holiday-item">
                 <div class="holiday-info">
                     <span class="holiday-date">${formatted}</span>
-                    <span class="holiday-name">${holiday.name}</span>
+                    <span class="holiday-name">${escapeHtml(holiday.name)}</span>
                 </div>
-                <button class="btn-icon danger" onclick="deleteHoliday('${holiday.date}')" title="Delete">
+                <button class="btn-icon danger" onclick="deleteHoliday('${escapeHtml(holiday.date)}')" title="Delete">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="18" y1="6" x2="6" y2="18"></line>
                         <line x1="6" y1="6" x2="18" y2="18"></line>

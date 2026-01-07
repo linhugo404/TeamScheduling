@@ -12,6 +12,8 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const compression = require('compression');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const http = require('http');
 const path = require('path');
 const { Server } = require('socket.io');
@@ -51,6 +53,35 @@ initBookingsRoutes({
 // ============================================
 // Middleware
 // ============================================
+
+// Security headers using Helmet
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "https://alcdn.msauth.net", "https://unpkg.com"],
+            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://unpkg.com"],
+            fontSrc: ["'self'", "https://fonts.gstatic.com"],
+            imgSrc: ["'self'", "data:", "https:", "blob:"],
+            connectSrc: ["'self'", "https://graph.microsoft.com", "https://login.microsoftonline.com", "wss:", "ws:"],
+            frameSrc: ["'none'"],
+            objectSrc: ["'none'"],
+            baseUri: ["'self'"],
+            formAction: ["'self'"],
+        },
+    },
+    crossOriginEmbedderPolicy: false, // Required for loading external resources
+}));
+
+// Rate limiting for API endpoints
+const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 200, // Limit each IP to 200 requests per windowMs
+    message: { error: 'Too many requests, please try again later.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+app.use('/api/', apiLimiter);
 
 // Enable Gzip compression for all responses
 app.use(compression());
@@ -152,6 +183,10 @@ httpServer.listen(PORT, () => {
 ║   ✓ Auth          ✓ Bookings      ✓ Locations            ║
 ║   ✓ Teams         ✓ Holidays      ✓ Desks                ║
 ║   ✓ Floor Plans   ✓ Desk Bookings ✓ Socket.IO            ║
+║                                                           ║
+║   Security:                                               ║
+║   ✓ Helmet (CSP, HSTS, X-Frame, etc.)                    ║
+║   ✓ Rate Limiting (200 req/15min per IP)                 ║
 ║                                                           ║
 ║   Press Ctrl+C to stop                                    ║
 ║                                                           ║

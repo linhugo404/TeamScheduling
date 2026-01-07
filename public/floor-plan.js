@@ -3,6 +3,14 @@
 // Loaded on-demand when user navigates to Floor Plan view
 // ============================================
 
+// Utility function to escape HTML (XSS prevention)
+function escapeHtmlFloorPlan(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 // Desk state
 let deskState = {
     desks: [],
@@ -118,7 +126,7 @@ function initDesksView() {
     if (teamSelect) {
         const sortedTeams = [...state.teams].sort((a, b) => a.name.localeCompare(b.name));
         teamSelect.innerHTML = sortedTeams.map(t => 
-            `<option value="${t.id}">${t.name}</option>`
+            `<option value="${escapeHtmlFloorPlan(t.id)}">${escapeHtmlFloorPlan(t.name)}</option>`
         ).join('');
     }
     
@@ -1042,13 +1050,13 @@ function openDeskModal(deskId = null) {
     // Populate location select with current location selected (sorted alphabetically)
     const sortedLocations = [...state.locations].sort((a, b) => a.name.localeCompare(b.name));
     locationInput.innerHTML = sortedLocations.map(loc => 
-        `<option value="${loc.id}" ${loc.id === state.currentLocation ? 'selected' : ''}>${loc.name}</option>`
+        `<option value="${escapeHtmlFloorPlan(loc.id)}" ${loc.id === state.currentLocation ? 'selected' : ''}>${escapeHtmlFloorPlan(loc.name)}</option>`
     ).join('');
     
     // Populate team select (sorted alphabetically)
     const sortedTeams = [...state.teams].sort((a, b) => a.name.localeCompare(b.name));
     assignedTeamSelect.innerHTML = sortedTeams.map(t => 
-        `<option value="${t.id}">${t.name}</option>`
+        `<option value="${escapeHtmlFloorPlan(t.id)}">${escapeHtmlFloorPlan(t.name)}</option>`
     ).join('');
     
     if (deskId) {
@@ -1401,13 +1409,13 @@ function openDeskBookingModal(deskId) {
         const sortedTeams = [...state.teams].sort((a, b) => a.name.localeCompare(b.name));
         teamSelect.innerHTML = '<option value="">-- No team --</option>' + 
             sortedTeams.map(team => 
-                `<option value="${team.id}" ${team.id === savedTeamId ? 'selected' : ''} style="color: ${team.color}">${team.name}</option>`
+                `<option value="${escapeHtmlFloorPlan(team.id)}" ${team.id === savedTeamId ? 'selected' : ''} style="color: ${escapeHtmlFloorPlan(team.color)}">${escapeHtmlFloorPlan(team.name)}</option>`
             ).join('');
     }
     
     infoDiv.innerHTML = `
-        <h3>${desk.name}</h3>
-        <p>${location?.name || ''} ${desk.floor ? `• Floor ${desk.floor}` : ''} ${desk.zone ? `• ${desk.zone}` : ''}</p>
+        <h3>${escapeHtmlFloorPlan(desk.name)}</h3>
+        <p>${escapeHtmlFloorPlan(location?.name || '')} ${desk.floor ? `• Floor ${desk.floor}` : ''} ${desk.zone ? `• ${escapeHtmlFloorPlan(desk.zone)}` : ''}</p>
         <p class="booking-date">${new Date(deskState.selectedDate).toLocaleDateString('en-ZA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
         <p class="booking-type">${isBooked ? 'Currently Booked' : 'Full Day Booking'}</p>
     `;

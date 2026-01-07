@@ -4,7 +4,7 @@
  */
 
 import { state, elements } from './state.js';
-import { formatDateStr, getBookingPeopleCount, getInitials, getAvatarHTML } from './utils.js';
+import { formatDateStr, getBookingPeopleCount, getInitials, getAvatarHTML, escapeHtml } from './utils.js';
 import { loadBookingsForMonth } from './api.js';
 import { joinCurrentRoom } from './socket.js';
 
@@ -95,7 +95,7 @@ function renderCalendarGrid(year, month, monthBookings, capacity, today, isLoadi
         
         // Holiday label
         if (holiday) {
-            dayContent += `<span class="holiday-label">${holiday.name}</span>`;
+            dayContent += `<span class="holiday-label">${escapeHtml(holiday.name)}</span>`;
         }
         
         // Booking chips with drag & drop (sorted by team name)
@@ -115,19 +115,19 @@ function renderCalendarGrid(year, month, monthBookings, capacity, today, isLoadi
                 const color = team ? team.color : '#6B7280';
                 const displayName = team ? team.name : booking.teamName;
                 const isOverbooked = booking.notes && booking.notes.startsWith('[OVERBOOKED]');
-                const isLoading = booking._isLoading;
+                const isLoadingBooking = booking._isLoading;
                 
                 dayContent += `
-                    <div class="booking-chip ${isOverbooked ? 'overbooked' : ''} ${isLoading ? 'loading' : ''}" 
-                         style="background: ${color}" 
-                         draggable="${!isLoading}"
-                         ondragstart="handleDragStart(event, '${booking.id}')"
+                    <div class="booking-chip ${isOverbooked ? 'overbooked' : ''} ${isLoadingBooking ? 'loading' : ''}" 
+                         style="background: ${escapeHtml(color)}" 
+                         draggable="${!isLoadingBooking}"
+                         ondragstart="handleDragStart(event, '${escapeHtml(booking.id)}')"
                          ondragend="handleDragEnd(event)"
-                         onmouseenter="showTeamTooltip(event, '${booking.teamId}')"
+                         onmouseenter="showTeamTooltip(event, '${escapeHtml(booking.teamId)}')"
                          onmouseleave="hideTeamTooltip()">
-                        <span>${displayName}</span>
+                        <span>${escapeHtml(displayName)}</span>
                         ${isOverbooked ? '<span class="overbooked-icon" title="Overbooked">⚠️</span>' : ''}
-                        ${isLoading ? '<span class="chip-spinner"></span>' : ''}
+                        ${isLoadingBooking ? '<span class="chip-spinner"></span>' : ''}
                     </div>`;
             });
             
@@ -197,7 +197,7 @@ function renderCalendarList(year, month, monthBookings, capacity, today, isLoadi
         if (isLoading && !holiday) {
             bookingsHtml = `<div class="calendar-list-loading-skeleton"></div>`;
         } else if (holiday) {
-            bookingsHtml = `<div class="calendar-list-holiday">${holiday.name}</div>`;
+            bookingsHtml = `<div class="calendar-list-holiday">${escapeHtml(holiday.name)}</div>`;
         } else if (dayBookings.length > 0) {
             const sortedBookings = [...dayBookings].sort((a, b) => {
                 const teamA = state.teams.find(t => t.id === a.teamId);
@@ -217,18 +217,18 @@ function renderCalendarList(year, month, monthBookings, capacity, today, isLoadi
                 // Avatar HTML
                 let avatarHtml = '';
                 if (managerImage) {
-                    avatarHtml = `<img src="${managerImage}" alt="${managerName}" class="calendar-list-booking-avatar" loading="lazy">`;
+                    avatarHtml = `<img src="${managerImage}" alt="${escapeHtml(managerName)}" class="calendar-list-booking-avatar" loading="lazy">`;
                 } else {
                     const initials = getInitials(managerName);
-                    avatarHtml = `<div class="calendar-list-booking-avatar" style="background: ${color}">${initials}</div>`;
+                    avatarHtml = `<div class="calendar-list-booking-avatar" style="background: ${escapeHtml(color)}">${initials}</div>`;
                 }
                 
                 bookingsHtml += `
                     <div class="calendar-list-booking" onclick="openBookingModal('${dateStr}')">
                         ${avatarHtml}
-                        <div class="calendar-list-booking-color" style="background: ${color}"></div>
+                        <div class="calendar-list-booking-color" style="background: ${escapeHtml(color)}"></div>
                         <div class="calendar-list-booking-info">
-                            <span class="calendar-list-booking-team">${displayName}</span>
+                            <span class="calendar-list-booking-team">${escapeHtml(displayName)}</span>
                             <span class="calendar-list-booking-count">${displayCount} people</span>
                         </div>
                     </div>

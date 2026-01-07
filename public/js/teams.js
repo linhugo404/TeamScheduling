@@ -4,7 +4,7 @@
  */
 
 import { state, elements } from './state.js';
-import { showToast, getAvatarHTML, getInitials, adjustColor } from './utils.js';
+import { showToast, getAvatarHTML, getInitials, adjustColor, escapeHtml } from './utils.js';
 import { createTeam, updateTeam, deleteTeamApi, invalidateBookingsCache, loadBookingsForMonth } from './api.js';
 import { renderCalendar } from './calendar.js';
 
@@ -22,7 +22,7 @@ export function renderTeamSelect() {
     
     select.innerHTML = '<option value="">Select a team...</option>' + 
         locationTeams.map(team => 
-            `<option value="${team.id}">${team.name} (${team.memberCount})</option>`
+            `<option value="${escapeHtml(team.id)}">${escapeHtml(team.name)} (${team.memberCount})</option>`
         ).join('');
 }
 
@@ -35,7 +35,7 @@ export function renderTeamLocationSelect() {
     
     const sortedLocations = [...state.locations].sort((a, b) => a.name.localeCompare(b.name));
     select.innerHTML = sortedLocations.map(loc => 
-        `<option value="${loc.id}">${loc.name}</option>`
+        `<option value="${escapeHtml(loc.id)}">${escapeHtml(loc.name)}</option>`
     ).join('');
 }
 
@@ -97,7 +97,7 @@ export function renderTeamsList() {
         locTeams.sort((a, b) => a.name.localeCompare(b.name));
         
         html += `<div class="location-group">
-            <h4 class="location-group-title">${location.name}</h4>
+            <h4 class="location-group-title">${escapeHtml(location.name)}</h4>
             <div class="teams-grid">`;
         
         locTeams.forEach(team => {
@@ -105,17 +105,17 @@ export function renderTeamsList() {
             
             html += `
                 <div class="team-card">
-                    <div class="team-card-header" style="background: linear-gradient(135deg, ${team.color}, ${adjustColor(team.color, -30)})">
+                    <div class="team-card-header" style="background: linear-gradient(135deg, ${escapeHtml(team.color)}, ${adjustColor(team.color, -30)})">
                         ${avatarHtml}
                         <div class="team-card-info">
-                            <h4>${team.name}</h4>
+                            <h4>${escapeHtml(team.name)}</h4>
                             <span class="team-member-count">${team.memberCount} members</span>
                         </div>
                     </div>
-                    ${team.manager ? `<div class="team-manager-row"><span>Manager:</span> ${team.manager}</div>` : ''}
+                    ${team.manager ? `<div class="team-manager-row"><span>Manager:</span> ${escapeHtml(team.manager)}</div>` : ''}
                     <div class="team-card-actions">
-                        <button class="btn btn-sm" onclick="editTeam('${team.id}')">Edit</button>
-                        <button class="btn btn-sm btn-danger" onclick="deleteTeam('${team.id}')">Delete</button>
+                        <button class="btn btn-sm" onclick="editTeam('${escapeHtml(team.id)}')">Edit</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteTeam('${escapeHtml(team.id)}')">Delete</button>
                     </div>
                 </div>
             `;
@@ -136,17 +136,17 @@ export function renderTeamsList() {
             
             html += `
                 <div class="team-card">
-                    <div class="team-card-header" style="background: linear-gradient(135deg, ${team.color}, ${adjustColor(team.color, -30)})">
+                    <div class="team-card-header" style="background: linear-gradient(135deg, ${escapeHtml(team.color)}, ${adjustColor(team.color, -30)})">
                         ${avatarHtml}
                         <div class="team-card-info">
-                            <h4>${team.name}</h4>
+                            <h4>${escapeHtml(team.name)}</h4>
                             <span class="team-member-count">${team.memberCount} members</span>
                         </div>
                     </div>
-                    ${team.manager ? `<div class="team-manager-row"><span>Manager:</span> ${team.manager}</div>` : ''}
+                    ${team.manager ? `<div class="team-manager-row"><span>Manager:</span> ${escapeHtml(team.manager)}</div>` : ''}
                     <div class="team-card-actions">
-                        <button class="btn btn-sm" onclick="editTeam('${team.id}')">Edit</button>
-                        <button class="btn btn-sm btn-danger" onclick="deleteTeam('${team.id}')">Delete</button>
+                        <button class="btn btn-sm" onclick="editTeam('${escapeHtml(team.id)}')">Edit</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteTeam('${escapeHtml(team.id)}')">Delete</button>
                     </div>
                 </div>
             `;
@@ -235,9 +235,9 @@ export function editTeam(id) {
     if (preview && team.manager) {
         preview.innerHTML = `
             <div class="selected-manager-info">
-                ${team.managerImage ? `<img src="${team.managerImage}" alt="${team.manager}">` : `<div class="manager-photo-placeholder">${team.manager.charAt(0)}</div>`}
+                ${team.managerImage ? `<img src="${team.managerImage}" alt="${escapeHtml(team.manager)}">` : `<div class="manager-photo-placeholder">${escapeHtml(team.manager.charAt(0))}</div>`}
                 <div>
-                    <strong>${team.manager}</strong>
+                    <strong>${escapeHtml(team.manager)}</strong>
                 </div>
             </div>
             <button type="button" class="btn btn-sm" onclick="clearSelectedManager()">Clear</button>
@@ -322,14 +322,14 @@ export function showTeamTooltip(event, teamId) {
     const avatarHtml = getAvatarHTML(team.manager, team.managerImage, team.color, 'tooltip-avatar');
     
     tooltip.innerHTML = `
-        <div class="tooltip-header" style="background: linear-gradient(135deg, ${team.color}, ${adjustColor(team.color, -30)})">
+        <div class="tooltip-header" style="background: linear-gradient(135deg, ${escapeHtml(team.color)}, ${adjustColor(team.color, -30)})">
             ${avatarHtml}
             <div class="tooltip-info">
-                <strong>${team.name}</strong>
+                <strong>${escapeHtml(team.name)}</strong>
                 <span>${team.memberCount} members</span>
             </div>
         </div>
-        ${team.manager ? `<div class="tooltip-manager">Manager: ${team.manager}</div>` : ''}
+        ${team.manager ? `<div class="tooltip-manager">Manager: ${escapeHtml(team.manager)}</div>` : ''}
     `;
     
     // Position tooltip

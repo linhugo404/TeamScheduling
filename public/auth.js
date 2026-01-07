@@ -1,5 +1,13 @@
 // Azure AD Authentication using MSAL.js
 
+// Utility function to escape HTML (XSS prevention)
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 // Config will be loaded from server
 let msalConfig = null;
 
@@ -423,10 +431,10 @@ function showUserUI(user) {
     
     if (userAvatar) {
         if (user.photo) {
-            userAvatar.innerHTML = `<img src="${user.photo}" alt="${user.name}">`;
+            userAvatar.innerHTML = `<img src="${user.photo}" alt="${escapeHtml(user.name)}">`;
         } else {
             const initials = user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-            userAvatar.innerHTML = `<span>${initials}</span>`;
+            userAvatar.innerHTML = `<span>${escapeHtml(initials)}</span>`;
         }
     }
     

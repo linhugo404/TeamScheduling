@@ -4,11 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Office Booking System</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23FF6B35' stroke-width='2'%3E%3Cpath d='M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'/%3E%3Cpolyline points='9 22 9 12 15 12 15 22'/%3E%3C/svg%3E">
+    
+    <!-- Preconnect for performance -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    
+    <!-- Stylesheets -->
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
     <!-- Inline theme detection to prevent flash of wrong theme -->
     <script>
         (function() {
@@ -19,12 +27,59 @@
             document.documentElement.setAttribute('data-theme', saved);
         })();
     </script>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
-    <script src="auth.js"></script>
+    
+    <!-- External scripts with defer for non-blocking load -->
+    <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script defer src="/socket.io/socket.io.js"></script>
+    <script defer src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+    <script defer src="auth.js"></script>
+    
+    <!-- Noscript fallback styles -->
+    <noscript>
+        <style>
+            .noscript-message {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                min-height: 100vh;
+                background: var(--bg-primary, #1a1a2e);
+                color: var(--text-primary, #ffffff);
+                font-family: 'Outfit', sans-serif;
+                text-align: center;
+                padding: 2rem;
+            }
+            .noscript-message svg {
+                width: 64px;
+                height: 64px;
+                stroke: #FF6B35;
+                margin-bottom: 1rem;
+            }
+            .noscript-message h1 {
+                font-size: 1.5rem;
+                margin-bottom: 0.5rem;
+            }
+            .noscript-message p {
+                color: #a0a0a0;
+            }
+            .app, .login-overlay { display: none !important; }
+        </style>
+    </noscript>
 </head>
 <body>
+    <!-- Noscript fallback for users with JavaScript disabled -->
+    <noscript>
+        <div class="noscript-message">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                <polyline points="9 22 9 12 15 12 15 22"></polyline>
+            </svg>
+            <h1>JavaScript Required</h1>
+            <p>The Office Booking System requires JavaScript to run.</p>
+            <p>Please enable JavaScript in your browser settings and refresh the page.</p>
+        </div>
+    </noscript>
+    
     <!-- Login Overlay -->
     <div id="loginOverlay" class="login-overlay visible">
         <div class="login-container">

@@ -5,7 +5,7 @@
 
 export const state = {
     currentDate: new Date(),
-    currentLocation: 'jhb',
+    currentLocation: null, // Will be set to first available location on load
     locations: [],
     teams: [],
     bookings: [],

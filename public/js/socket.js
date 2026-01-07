@@ -4,7 +4,7 @@
  */
 
 import { state } from './state.js';
-import { stringToColor } from './utils.js';
+import { stringToColor, escapeHtml } from './utils.js';
 
 let socket = null;
 
@@ -98,8 +98,8 @@ export function renderViewers() {
     const overflow = state.viewers.length - maxShow;
     
     let html = shown.map(v => `
-        <div class="presence-avatar" style="background: ${v.color}" title="${v.name}">
-            ${v.name.charAt(0).toUpperCase()}
+        <div class="presence-avatar" style="background: ${escapeHtml(v.color)}" title="${escapeHtml(v.name)}">
+            ${escapeHtml(v.name.charAt(0).toUpperCase())}
         </div>
     `).join('');
     

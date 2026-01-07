@@ -1715,14 +1715,17 @@ function editLocation(id) {
 }
 
 async function deleteTeam(id) {
-    if (!confirm('Are you sure you want to delete this team?')) return;
+    if (!confirm('Are you sure you want to delete this team? All bookings for this team will also be deleted.')) return;
     
     try {
         await fetch(`/api/teams/${id}`, { method: 'DELETE' });
         showToast('Team deleted', 'success');
         
+        // Clear bookings cache to force refresh
+        state.bookingsCache = {};
+        
         await loadData();
-        await loadBookingsForMonth(); // Refresh bookings for calendar display
+        await loadBookingsForMonth(true); // Force refresh bookings
         renderTeamsList();
         renderTeamSelect();
         renderCalendar();

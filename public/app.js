@@ -1048,7 +1048,11 @@ function checkOverbooking() {
     }
 }
 
+// Track if overbooking is happening
+let isOverbooking = false;
+
 function showOverbookingWarning(total, capacity, excess) {
+    isOverbooking = true;
     const warning = document.getElementById('overbookingWarning');
     const message = document.getElementById('overbookingMessage');
     const notesLabel = document.getElementById('notesRequiredLabel');
@@ -1062,12 +1066,13 @@ function showOverbookingWarning(total, capacity, excess) {
         notesLabel.style.display = 'inline';
     }
     if (notesField) {
-        notesField.required = true;
         notesField.placeholder = 'Required: Explain why overbooking is needed...';
+        notesField.style.borderColor = 'var(--warning)';
     }
 }
 
 function hideOverbookingWarning() {
+    isOverbooking = false;
     const warning = document.getElementById('overbookingWarning');
     const notesLabel = document.getElementById('notesRequiredLabel');
     const notesField = document.getElementById('bookingNotes');
@@ -1079,8 +1084,8 @@ function hideOverbookingWarning() {
         notesLabel.style.display = 'none';
     }
     if (notesField) {
-        notesField.required = false;
         notesField.placeholder = 'Any additional notes...';
+        notesField.style.borderColor = '';
     }
 }
 
@@ -1184,6 +1189,13 @@ async function handleBookingSubmit(e) {
     const team = state.teams.find(t => t.id === teamId);
     const peopleCount = parseInt(document.getElementById('peopleCount').value);
     const notes = document.getElementById('bookingNotes').value;
+    
+    // Validate notes for overbooking
+    if (isOverbooking && (!notes || notes.trim().length === 0)) {
+        showToast('Please provide a note explaining the overbooking', 'error');
+        document.getElementById('bookingNotes').focus();
+        return;
+    }
     
     try {
         if (bookingId) {

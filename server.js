@@ -306,8 +306,7 @@ app.post('/api/bookings', async (req, res) => {
             team_name: teamName || teamId,
             people_count: parseInt(peopleCount),
             location_id: locationId,
-            notes: notes || '',
-            is_overbooked: isOverbooked,
+            notes: isOverbooked ? `[OVERBOOKED] ${notes || ''}` : (notes || ''),
             created_at: new Date().toISOString()
         };
         

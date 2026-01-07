@@ -3,6 +3,11 @@ const router = express.Router();
 const { supabase } = require('../config/supabase');
 const { toCamelCase } = require('../utils/helpers');
 const logger = require('../utils/logger');
+const { requireAuthForWrites } = require('../middleware/requireAuth');
+
+// Apply auth middleware to all routes in this router
+// GET requests allowed without auth, POST/PUT/DELETE require auth (if REQUIRE_AUTH=true)
+router.use(requireAuthForWrites);
 
 // These will be injected from server.js
 let emitRoomDataChanged = null;

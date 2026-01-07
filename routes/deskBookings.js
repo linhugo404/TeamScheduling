@@ -3,6 +3,10 @@ const router = express.Router();
 const { supabase } = require('../config/supabase');
 const { toCamelCase } = require('../utils/helpers');
 const logger = require('../utils/logger');
+const { requireAuthForWrites } = require('../middleware/requireAuth');
+
+// Protect write operations
+router.use(requireAuthForWrites);
 
 /**
  * Get desk bookings for a date/location

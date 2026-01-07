@@ -34,6 +34,9 @@ const desksRoutes = require('./routes/desks');
 const floorElementsRoutes = require('./routes/floorElements');
 const deskBookingsRoutes = require('./routes/deskBookings');
 
+// Import middleware
+const { authenticate, optionalAuth } = require('./middleware/auth');
+
 // Initialize Express app
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -114,14 +117,19 @@ app.use(express.static('public', {
 // Routes
 // ============================================
 
-// Auth routes (mounted at /auth and /api/auth)
+// Public routes (no authentication required)
 app.use('/auth', authRoutes);
 app.use('/api/auth', authRoutes);
 
-// Data route (initial load)
+// Apply optional authentication to all API routes
+// This attaches user info if a valid token is present, but doesn't require it
+app.use('/api', optionalAuth);
+
+// Data route (initial load - read only, no auth required)
 app.use('/api/data', dataRoutes);
 
-// Resource routes
+// Protected resource routes
+// GET requests work without auth, but POST/PUT/DELETE require authentication
 app.use('/api/bookings', bookingsRoutes);
 app.use('/api/locations', locationsRoutes);
 app.use('/api/holidays', holidaysRoutes);

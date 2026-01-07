@@ -743,6 +743,18 @@ app.delete('/api/teams/:id', async (req, res) => {
     try {
         const { id } = req.params;
         
+        // First, delete all bookings for this team
+        const { error: bookingsError } = await supabase
+            .from('bookings')
+            .delete()
+            .eq('team_id', id);
+        
+        if (bookingsError) {
+            console.error('Error deleting team bookings:', bookingsError);
+            // Continue anyway - team deletion is more important
+        }
+        
+        // Then delete the team
         const { error } = await supabase
             .from('teams')
             .delete()

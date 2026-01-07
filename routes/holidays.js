@@ -3,6 +3,7 @@ const https = require('https');
 const router = express.Router();
 const { supabase } = require('../config/supabase');
 const { toCamelCase } = require('../utils/helpers');
+const logger = require('../utils/logger');
 
 /**
  * Fetch public holidays from Nager.Date API
@@ -37,7 +38,7 @@ router.get('/fetch/:year', async (req, res) => {
         
         res.json(formattedHolidays);
     } catch (error) {
-        console.error('Error fetching holidays:', error);
+        logger.error('Error fetching holidays:', error);
         res.status(500).json({ error: 'Failed to fetch holidays from API' });
     }
 });
@@ -63,7 +64,7 @@ router.post('/', async (req, res) => {
         
         res.json(toCamelCase(allHolidays));
     } catch (error) {
-        console.error('Error updating holidays:', error);
+        logger.error('Error updating holidays:', error);
         res.status(500).json({ error: 'Failed to update holidays' });
     }
 });
@@ -83,7 +84,7 @@ router.delete('/:date', async (req, res) => {
         if (error) throw error;
         res.json({ success: true });
     } catch (error) {
-        console.error('Error deleting holiday:', error);
+        logger.error('Error deleting holiday:', error);
         res.status(500).json({ error: 'Failed to delete holiday' });
     }
 });

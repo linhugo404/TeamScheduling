@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { supabase } = require('../config/supabase');
 const { toCamelCase } = require('../utils/helpers');
+const logger = require('../utils/logger');
 
 /**
  * Get desk bookings for a date/location
@@ -21,7 +22,7 @@ router.get('/', async (req, res) => {
         
         res.json(toCamelCase(data));
     } catch (error) {
-        console.error('Error fetching desk bookings:', error);
+        logger.error('Error fetching desk bookings:', error);
         res.status(500).json({ error: 'Failed to fetch desk bookings' });
     }
 });
@@ -82,7 +83,7 @@ router.post('/', async (req, res) => {
         if (error) throw error;
         res.status(201).json(toCamelCase(data));
     } catch (error) {
-        console.error('Error creating desk booking:', error);
+        logger.error('Error creating desk booking:', error);
         res.status(500).json({ error: 'Failed to create desk booking' });
     }
 });
@@ -102,7 +103,7 @@ router.delete('/:id', async (req, res) => {
         if (error) throw error;
         res.json({ success: true });
     } catch (error) {
-        console.error('Error canceling desk booking:', error);
+        logger.error('Error canceling desk booking:', error);
         res.status(500).json({ error: 'Failed to cancel desk booking' });
     }
 });
@@ -163,7 +164,7 @@ router.post('/:id/checkin', async (req, res) => {
         
         res.json({ success: true, booking: toCamelCase(updated) });
     } catch (error) {
-        console.error('Error checking in:', error);
+        logger.error('Error checking in:', error);
         res.status(500).json({ error: 'Failed to check in' });
     }
 });
@@ -207,7 +208,7 @@ router.get('/checkin/:qrCode', async (req, res) => {
             todayBookings: toCamelCase(todayBookings || [])
         });
     } catch (error) {
-        console.error('Error getting check-in data:', error);
+        logger.error('Error getting check-in data:', error);
         res.status(500).json({ error: 'Failed to get check-in data' });
     }
 });

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { supabase } = require('../config/supabase');
 const { toCamelCase } = require('../utils/helpers');
+const logger = require('../utils/logger');
 
 /**
  * Create a new team
@@ -33,7 +34,7 @@ router.post('/', async (req, res) => {
         if (error) throw error;
         res.status(201).json(toCamelCase(data));
     } catch (error) {
-        console.error('Error creating team:', error);
+        logger.error('Error creating team:', error);
         res.status(500).json({ error: 'Failed to create team' });
     }
 });
@@ -68,7 +69,7 @@ router.put('/:id', async (req, res) => {
         
         res.json(toCamelCase(data));
     } catch (error) {
-        console.error('Error updating team:', error);
+        logger.error('Error updating team:', error);
         res.status(500).json({ error: 'Failed to update team' });
     }
 });
@@ -87,7 +88,7 @@ router.delete('/:id', async (req, res) => {
             .eq('team_id', id);
         
         if (bookingsError) {
-            console.error('Error deleting team bookings:', bookingsError);
+            logger.error('Error deleting team bookings:', bookingsError);
             // Continue anyway - team deletion is more important
         }
         
@@ -100,7 +101,7 @@ router.delete('/:id', async (req, res) => {
         if (error) throw error;
         res.json({ success: true });
     } catch (error) {
-        console.error('Error deleting team:', error);
+        logger.error('Error deleting team:', error);
         res.status(500).json({ error: 'Failed to delete team' });
     }
 });

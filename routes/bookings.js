@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { supabase } = require('../config/supabase');
 const { toCamelCase } = require('../utils/helpers');
+const logger = require('../utils/logger');
 
 // These will be injected from server.js
 let emitRoomDataChanged = null;
@@ -44,7 +45,7 @@ router.get('/', async (req, res) => {
         if (error) throw error;
         res.json(toCamelCase(data));
     } catch (error) {
-        console.error('Error fetching bookings:', error);
+        logger.error('Error fetching bookings:', error);
         res.status(500).json({ error: 'Failed to fetch bookings' });
     }
 });
@@ -105,7 +106,7 @@ router.post('/', async (req, res) => {
             }
             // Overbooking allowed with notes - continue
             isOverbooked = true;
-            console.log(`Overbooking allowed for ${date}: ${currentTotal + peopleCount}/${location.capacity} with note: ${notes}`);
+            logger.info(`Overbooking allowed for ${date}: ${currentTotal + peopleCount}/${location.capacity} with note: ${notes}`);
         }
         
         const newBooking = {
@@ -137,7 +138,7 @@ router.post('/', async (req, res) => {
         
         res.status(201).json(booking);
     } catch (error) {
-        console.error('Error creating booking:', error);
+        logger.error('Error creating booking:', error);
         res.status(500).json({ error: 'Failed to create booking' });
     }
 });
@@ -239,7 +240,7 @@ router.put('/:id', async (req, res) => {
         
         res.json(after);
     } catch (error) {
-        console.error('Error updating booking:', error);
+        logger.error('Error updating booking:', error);
         res.status(500).json({ error: 'Failed to update booking' });
     }
 });
@@ -297,7 +298,7 @@ router.get('/:id/ics', async (req, res) => {
         res.setHeader('Content-Disposition', `attachment; filename="booking-${booking.id}.ics"`);
         res.send(icsContent);
     } catch (error) {
-        console.error('Error generating ICS:', error);
+        logger.error('Error generating ICS:', error);
         res.status(500).json({ error: 'Failed to generate calendar file' });
     }
 });
@@ -337,7 +338,7 @@ router.delete('/:id', async (req, res) => {
         
         res.json({ success: true });
     } catch (error) {
-        console.error('Error deleting booking:', error);
+        logger.error('Error deleting booking:', error);
         res.status(500).json({ error: 'Failed to delete booking' });
     }
 });

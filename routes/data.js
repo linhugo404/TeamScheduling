@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { supabase } = require('../config/supabase');
 const { toCamelCase } = require('../utils/helpers');
+const logger = require('../utils/logger');
 
 /**
  * Get all data (locations, teams, bookings, holidays, desks, etc.)
@@ -41,7 +42,7 @@ router.get('/', async (req, res) => {
             floorElements: toCamelCase(floorElements)
         });
     } catch (error) {
-        console.error('Error fetching data:', error);
+        logger.error('Error fetching data:', error);
         res.status(500).json({ error: 'Failed to read data' });
     }
 });

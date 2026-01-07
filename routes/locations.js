@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { supabase } = require('../config/supabase');
 const { toCamelCase } = require('../utils/helpers');
+const logger = require('../utils/logger');
 
 /**
  * Create a new location
@@ -27,7 +28,7 @@ router.post('/', async (req, res) => {
         if (error) throw error;
         res.status(201).json(toCamelCase(data));
     } catch (error) {
-        console.error('Error creating location:', error);
+        logger.error('Error creating location:', error);
         res.status(500).json({ error: 'Failed to create location' });
     }
 });
@@ -62,7 +63,7 @@ router.put('/:id', async (req, res) => {
         
         res.json(toCamelCase(data));
     } catch (error) {
-        console.error('Error updating location:', error);
+        logger.error('Error updating location:', error);
         res.status(500).json({ error: 'Failed to update location' });
     }
 });
@@ -85,7 +86,7 @@ router.delete('/:id', async (req, res) => {
         if (error) throw error;
         res.json({ success: true });
     } catch (error) {
-        console.error('Error deleting location:', error);
+        logger.error('Error deleting location:', error);
         res.status(500).json({ error: 'Failed to delete location' });
     }
 });

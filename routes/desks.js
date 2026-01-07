@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { supabase } = require('../config/supabase');
 const { toCamelCase } = require('../utils/helpers');
+const logger = require('../utils/logger');
 
 /**
  * Get all desks for a location
@@ -20,7 +21,7 @@ router.get('/', async (req, res) => {
         
         res.json(toCamelCase(data));
     } catch (error) {
-        console.error('Error fetching desks:', error);
+        logger.error('Error fetching desks:', error);
         res.status(500).json({ error: 'Failed to fetch desks' });
     }
 });
@@ -62,7 +63,7 @@ router.post('/', async (req, res) => {
         if (error) throw error;
         res.status(201).json(toCamelCase(data));
     } catch (error) {
-        console.error('Error creating desk:', error);
+        logger.error('Error creating desk:', error);
         res.status(500).json({ error: 'Failed to create desk' });
     }
 });
@@ -102,7 +103,7 @@ router.put('/:id', async (req, res) => {
         
         res.json(toCamelCase(data));
     } catch (error) {
-        console.error('Error updating desk:', error);
+        logger.error('Error updating desk:', error);
         res.status(500).json({ error: 'Failed to update desk' });
     }
 });
@@ -125,7 +126,7 @@ router.delete('/:id', async (req, res) => {
         if (error) throw error;
         res.json({ success: true });
     } catch (error) {
-        console.error('Error deleting desk:', error);
+        logger.error('Error deleting desk:', error);
         res.status(500).json({ error: 'Failed to delete desk' });
     }
 });

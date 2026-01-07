@@ -3,7 +3,7 @@
 This document tracks known issues, improvements, and technical debt that need to be addressed.
 
 **Last Updated:** January 7, 2026  
-**Total Items:** 21 (7 completed)
+**Total Items:** 21 (10 completed)
 
 ---
 
@@ -124,7 +124,7 @@ const response = await fetch(url, { signal: controller.signal });
 
 ---
 
-### [ ] 104 Console Logs in Production
+### [x] 104 Console Logs in Production
 **ID:** `console-logs`  
 **Priority:** Medium  
 **Description:** Console.log/error/warn found in 21 files. Should not be in production.  
@@ -167,7 +167,7 @@ const log = process.env.NODE_ENV === 'production' ? () => {} : console.log;
 
 ## 🟢 Low (Tooling/Cleanup)
 
-### [ ] No ESLint/Prettier
+### [x] No ESLint/Prettier
 **ID:** `eslint-prettier`  
 **Priority:** Low  
 **Description:** No linting or formatting configuration. Code style not enforced.  
@@ -181,7 +181,7 @@ const log = process.env.NODE_ENV === 'production' ? () => {} : console.log;
 
 ---
 
-### [ ] Missing npm Scripts
+### [x] Missing npm Scripts
 **ID:** `package-scripts`  
 **Priority:** Low  
 **Description:** Only `start` and `dev` scripts exist. Missing lint, test, build, format.  
@@ -263,10 +263,10 @@ const log = process.env.NODE_ENV === 'production' ? () => {} : console.log;
 |----------|-------|-----------|-----------|
 | 🔴 Critical | 4 | 3 | 1 |
 | 🟠 High | 5 | 0 | 5 |
-| 🟡 Medium | 5 | 2 | 3 |
-| 🟢 Low | 6 | 2 | 4 |
+| 🟡 Medium | 5 | 3 | 2 |
+| 🟢 Low | 6 | 4 | 2 |
 | 🔵 Future | 1 | 0 | 1 |
-| **Total** | **21** | **7** | **14** |
+| **Total** | **21** | **10** | **11** |
 
 ---
 

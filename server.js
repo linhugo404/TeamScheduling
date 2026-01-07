@@ -21,6 +21,7 @@ const { Server } = require('socket.io');
 // Import modules
 const { supabase } = require('./config/supabase');
 const { initializeSocketHandlers, roomKeyForBooking, emitRoomDataChanged } = require('./socket/presence');
+const logger = require('./utils/logger');
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -162,7 +163,7 @@ app.get('/api/checkin/:qrCode', async (req, res) => {
             todayBookings: toCamelCase(todayBookings || [])
         });
     } catch (error) {
-        console.error('Error getting check-in data:', error);
+        logger.error('Error getting check-in data:', error);
         res.status(500).json({ error: 'Failed to get check-in data' });
     }
 });

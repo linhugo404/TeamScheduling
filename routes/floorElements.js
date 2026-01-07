@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { supabase } = require('../config/supabase');
 const { toCamelCase } = require('../utils/helpers');
+const logger = require('../utils/logger');
 
 /**
  * Get floor elements for a location/floor
@@ -19,7 +20,7 @@ router.get('/', async (req, res) => {
         
         res.json(toCamelCase(data));
     } catch (error) {
-        console.error('Error fetching floor elements:', error);
+        logger.error('Error fetching floor elements:', error);
         res.status(500).json({ error: 'Failed to get floor elements' });
     }
 });
@@ -60,7 +61,7 @@ router.post('/', async (req, res) => {
         if (error) throw error;
         res.status(201).json(toCamelCase(data));
     } catch (error) {
-        console.error('Error creating floor element:', error);
+        logger.error('Error creating floor element:', error);
         res.status(500).json({ error: 'Failed to create floor element' });
     }
 });
@@ -100,7 +101,7 @@ router.put('/:id', async (req, res) => {
         
         res.json(toCamelCase(data));
     } catch (error) {
-        console.error('Error updating floor element:', error);
+        logger.error('Error updating floor element:', error);
         res.status(500).json({ error: 'Failed to update floor element' });
     }
 });
@@ -120,7 +121,7 @@ router.delete('/:id', async (req, res) => {
         if (error) throw error;
         res.json({ success: true });
     } catch (error) {
-        console.error('Error deleting floor element:', error);
+        logger.error('Error deleting floor element:', error);
         res.status(500).json({ error: 'Failed to delete floor element' });
     }
 });

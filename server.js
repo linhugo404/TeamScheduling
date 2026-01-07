@@ -73,10 +73,10 @@ app.use(helmet({
             fontSrc: ["'self'", "https://fonts.gstatic.com"],
             imgSrc: ["'self'", "data:", "https:", "blob:"],
             connectSrc: ["'self'", "https://graph.microsoft.com", "https://login.microsoftonline.com", "wss:", "ws:"],
-            frameSrc: ["'none'"],
+            frameSrc: ["'self'", "https://login.microsoftonline.com"],
             objectSrc: ["'none'"],
             baseUri: ["'self'"],
-            formAction: ["'self'"],
+            formAction: ["'self'", "https://login.microsoftonline.com"],
         },
     },
     crossOriginEmbedderPolicy: false, // Required for loading external resources

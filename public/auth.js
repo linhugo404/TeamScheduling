@@ -11,9 +11,9 @@ function escapeHtml(text) {
 // Config will be loaded from server
 let msalConfig = null;
 
-// Scopes for Microsoft Graph
+// Scopes for login - includes OpenID scopes for ID token and Graph API scopes
 const loginRequest = {
-    scopes: ['User.Read', 'User.Read.All', 'Directory.Read.All']
+    scopes: ['openid', 'profile', 'email', 'User.Read', 'User.Read.All', 'Directory.Read.All']
 };
 
 const graphConfig = {
@@ -80,14 +80,21 @@ async function initializeMsal() {
     }
     
     authConfigured = true;
-    msalInstance = new msal.PublicClientApplication(msalConfig);
     
-    // Handle redirect response
-    msalInstance.handleRedirectPromise()
-        .then(handleResponse)
-        .catch(error => {
-            console.error('Auth redirect error:', error);
-        });
+    try {
+        msalInstance = new msal.PublicClientApplication(msalConfig);
+        
+        // Wait for MSAL to initialize (required for redirect handling)
+        await msalInstance.initialize();
+        
+        // Handle redirect response - this must be awaited
+        const response = await msalInstance.handleRedirectPromise();
+        await handleResponse(response);
+    } catch (error) {
+        console.error('MSAL initialization or redirect error:', error);
+        // Show login UI on error so user can try again
+        showLoginUI();
+    }
 }
 
 // Handle auth response
@@ -108,19 +115,19 @@ async function handleResponse(response) {
     }
 }
 
-// Sign in
+// Sign in - use redirect flow for better reliability
 async function signIn() {
+    if (!msalInstance) {
+        console.error('MSAL not initialized');
+        return;
+    }
+    
     try {
-        // Try popup first (better UX)
-        const response = await msalInstance.loginPopup(loginRequest);
-        currentAccount = response.account;
-        await onUserAuthenticated(currentAccount);
+        // Use redirect flow - more reliable than popup
+        await msalInstance.loginRedirect(loginRequest);
     } catch (error) {
-        if (error.name === 'BrowserAuthError' && error.errorCode === 'popup_window_error') {
-            // Popup blocked, fall back to redirect
-            msalInstance.loginRedirect(loginRequest);
-        } else {
-            console.error('Sign in error:', error);
+        console.error('Sign in error:', error);
+        if (typeof showToast === 'function') {
             showToast('Sign in failed: ' + error.message, 'error');
         }
     }
@@ -138,7 +145,7 @@ function signOut() {
     msalInstance.logoutRedirect(logoutRequest);
 }
 
-// Get access token silently
+// Get access token silently (for Microsoft Graph API calls)
 async function getAccessToken() {
     if (!msalInstance || !currentAccount) return null;
     
@@ -163,6 +170,34 @@ async function getAccessToken() {
             }
         }
         console.error('Token acquisition error:', error);
+        return null;
+    }
+}
+
+// Get ID token for backend API calls (has app client ID as audience)
+async function getIdToken() {
+    if (!msalInstance || !currentAccount) return null;
+    
+    // Request with openid scope to get ID token
+    const tokenRequest = {
+        scopes: ['openid', 'profile', 'email'],
+        account: currentAccount
+    };
+    
+    try {
+        const response = await msalInstance.acquireTokenSilent(tokenRequest);
+        return response.idToken;
+    } catch (error) {
+        if (error instanceof msal.InteractionRequiredAuthError) {
+            try {
+                const response = await msalInstance.acquireTokenRedirect(tokenRequest);
+                return response?.idToken;
+            } catch (redirectError) {
+                console.error('ID token acquisition failed:', redirectError);
+                return null;
+            }
+        }
+        console.error('ID token acquisition error:', error);
         return null;
     }
 }
@@ -464,10 +499,14 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Expose Azure AD functions globally for use by other modules
+window.signIn = signIn;
+window.signOut = signOut;
 window.fetchAllJobTitles = fetchAllJobTitles;
 window.fetchUsersByJobTitles = fetchUsersByJobTitles;
 window.fetchUserPhotoById = fetchUserPhotoById;
 window.fetchDirectReportsCount = fetchDirectReportsCount;
 window.isAuthenticated = isAuthenticated;
 window.getCurrentUser = getCurrentUser;
+window.getAccessToken = getAccessToken;
+window.getIdToken = getIdToken;
 

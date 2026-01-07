@@ -11,6 +11,40 @@ const DEFAULT_RETRIES = API_CONFIG.retries;
 const RETRY_DELAY = API_CONFIG.retryDelay;
 
 /**
+ * Get the ID token for backend API authentication
+ * ID tokens have the app's client ID as the audience, which the backend expects
+ * @returns {Promise<string|null>}
+ */
+async function getAuthToken() {
+    // Use the globally exposed getIdToken from auth.js for backend API calls
+    if (typeof window.getIdToken === 'function') {
+        try {
+            return await window.getIdToken();
+        } catch (error) {
+            console.warn('Failed to get ID token:', error);
+            return null;
+        }
+    }
+    return null;
+}
+
+/**
+ * Add authorization header if token is available
+ * @param {HeadersInit} headers - Existing headers
+ * @param {string|null} token - Access token
+ * @returns {HeadersInit}
+ */
+function addAuthHeader(headers = {}, token) {
+    if (token) {
+        return {
+            ...headers,
+            'Authorization': `Bearer ${token}`
+        };
+    }
+    return headers;
+}
+
+/**
  * Fetch with timeout support
  * @param {string} url - The URL to fetch
  * @param {RequestInit} options - Fetch options
@@ -113,9 +147,12 @@ export async function apiGet(url, config = {}) {
  * @returns {Promise<any>} - Parsed JSON response
  */
 export async function apiPost(url, data, config = {}) {
+    const token = await getAuthToken();
+    const headers = addAuthHeader({ 'Content-Type': 'application/json' }, token);
+    
     const response = await fetchWithRetry(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(data)
     }, config);
     
@@ -135,9 +172,12 @@ export async function apiPost(url, data, config = {}) {
  * @returns {Promise<any>} - Parsed JSON response
  */
 export async function apiPut(url, data, config = {}) {
+    const token = await getAuthToken();
+    const headers = addAuthHeader({ 'Content-Type': 'application/json' }, token);
+    
     const response = await fetchWithRetry(url, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(data)
     }, config);
     
@@ -156,7 +196,13 @@ export async function apiPut(url, data, config = {}) {
  * @returns {Promise<any>} - Parsed JSON response
  */
 export async function apiDelete(url, config = {}) {
-    const response = await fetchWithRetry(url, { method: 'DELETE' }, config);
+    const token = await getAuthToken();
+    const headers = addAuthHeader({}, token);
+    
+    const response = await fetchWithRetry(url, { 
+        method: 'DELETE',
+        headers
+    }, config);
     
     if (!response.ok) {
         const error = await response.json().catch(() => ({ error: 'Request failed' }));

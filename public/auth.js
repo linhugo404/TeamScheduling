@@ -194,12 +194,23 @@ async function fetchUserPhoto() {
         
         if (response.ok) {
             const blob = await response.blob();
-            return URL.createObjectURL(blob);
+            // Convert to base64 data URL so it persists after reload
+            return await blobToDataUrl(blob);
         }
     } catch (error) {
         // Photo not available is common, don't log as error
     }
     return null;
+}
+
+// Convert blob to base64 data URL
+function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
 }
 
 // Fetch all unique job titles from Azure AD
@@ -279,7 +290,8 @@ async function fetchUserPhotoById(userId) {
         
         if (response.ok) {
             const blob = await response.blob();
-            return URL.createObjectURL(blob);
+            // Convert to base64 data URL so it persists after reload
+            return await blobToDataUrl(blob);
         }
     } catch (error) {
         // Photo not available is common

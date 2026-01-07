@@ -40,8 +40,8 @@ async function fetchAuthConfig() {
                 navigateToLoginRequestUrl: true
             },
             cache: {
-                cacheLocation: 'sessionStorage',
-                storeAuthStateInCookie: false
+                cacheLocation: 'localStorage', // Use localStorage for better persistence
+                storeAuthStateInCookie: true   // Fallback for older browsers
             },
             system: {
                 loggerOptions: {

@@ -6,15 +6,27 @@
 import { renderTeamsList, renderTeamLocationSelect } from './teams.js';
 import { renderLocationsList } from './locations.js';
 import { renderHolidaysList, renderHolidayYearSelect } from './holidays.js';
+import { cleanupView } from './event-manager.js';
 
 // Floor plan module loading state
 let floorPlanModuleLoading = false;
 let floorPlanModuleLoaded = false;
 
+// Track current view for cleanup
+let currentView = 'calendar';
+
 /**
  * Switch to a different view
  */
 export async function switchView(viewName) {
+    // Cleanup event listeners from previous view
+    if (currentView && currentView !== viewName) {
+        cleanupView(currentView);
+    }
+    
+    // Update current view
+    currentView = viewName;
+    
     // Hide all views
     document.querySelectorAll('.view').forEach(view => {
         view.classList.remove('active');

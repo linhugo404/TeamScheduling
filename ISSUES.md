@@ -3,7 +3,7 @@
 This document tracks known issues, improvements, and technical debt that need to be addressed.
 
 **Last Updated:** January 7, 2026  
-**Total Items:** 21 (16 completed)
+**Total Items:** 21 (18 completed)
 
 ---
 
@@ -66,12 +66,13 @@ app.use('/api/', rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
 
 ---
 
-### [ ] Memory Leaks - Event Listeners
+### [x] Memory Leaks - Event Listeners
 **ID:** `memory-leaks`  
 **Priority:** High  
+**Status:** ✅ Completed  
 **Description:** 24 `addEventListener` calls but only 1 `removeEventListener`. Event listeners accumulate on view switches and calendar re-renders.  
 **Files Affected:** `main.js`, `views.js`, `calendar.js`, `azure-managers.js`  
-**Solution:** Track event listeners and remove them when components unmount or views change. Consider event delegation pattern.
+**Solution:** Created `event-manager.js` with tracked listeners, namespace support for bulk removal, and automatic cleanup on view switch via `cleanupView()`.
 
 ---
 
@@ -95,12 +96,13 @@ app.use('/api/', rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
 
 ---
 
-### [ ] Date Handling Without Timezone Awareness
+### [x] Date Handling Without Timezone Awareness
 **ID:** `timezone-handling`  
 **Priority:** High  
+**Status:** ✅ Completed  
 **Description:** Using `new Date().toISOString().split('T')[0]` can give wrong date near midnight depending on user's timezone.  
 **Files Affected:** `utils.js`, `calendar.js`, `bookings.js`, route files  
-**Solution:** Use date-fns or dayjs with timezone support, or always work in local time.
+**Solution:** Created `date-utils.js` with `formatLocalDate()`, `parseLocalDate()`, `getLocalToday()` - all timezone-aware. Updated `utils.js` to use these functions.
 
 ---
 
@@ -258,11 +260,11 @@ const log = process.env.NODE_ENV === 'production' ? () => {} : console.log;
 | Priority | Total | Completed | Remaining |
 |----------|-------|-----------|-----------|
 | 🔴 Critical | 4 | 4 | 0 |
-| 🟠 High | 5 | 3 | 2 |
+| 🟠 High | 5 | 5 | 0 |
 | 🟡 Medium | 5 | 5 | 0 |
 | 🟢 Low | 6 | 4 | 2 |
 | 🔵 Future | 1 | 0 | 1 |
-| **Total** | **21** | **16** | **5** |
+| **Total** | **21** | **18** | **3** |
 
 ---
 

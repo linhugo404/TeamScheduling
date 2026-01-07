@@ -3,6 +3,8 @@
  * Common helper functions used across the application
  */
 
+import { UI_CONFIG } from './config.js';
+
 /**
  * Format a Date object to YYYY-MM-DD string
  */
@@ -31,16 +33,21 @@ export function showToast(message, type = 'success') {
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
     toast.textContent = message;
+    
+    // Accessibility: announce to screen readers
+    toast.setAttribute('role', 'alert');
+    toast.setAttribute('aria-live', 'polite');
+    
     container.appendChild(toast);
     
     // Trigger animation
     setTimeout(() => toast.classList.add('show'), 10);
     
-    // Remove after 3 seconds
+    // Remove after configured duration
     setTimeout(() => {
         toast.classList.remove('show');
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
+        setTimeout(() => toast.remove(), UI_CONFIG.animationDuration);
+    }, UI_CONFIG.toastDuration);
 }
 
 /**

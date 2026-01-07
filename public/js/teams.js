@@ -59,7 +59,7 @@ export function openTeamModal() {
     renderTeamLocationSelect();
     
     // Update modal title
-    const title = elements.teamModal?.querySelector('h2');
+    const title = document.getElementById('teamModalTitle');
     if (title) title.textContent = 'Add Team';
     
     const submitBtn = document.getElementById('teamFormSubmitBtn');
@@ -232,7 +232,7 @@ export function editTeam(id) {
     document.getElementById('teamLocation').value = team.locationId || '';
     
     // Update modal title and button for editing
-    const title = elements.teamModal?.querySelector('h2');
+    const title = document.getElementById('teamModalTitle');
     if (title) title.textContent = 'Edit Team';
     
     const submitBtn = document.getElementById('teamFormSubmitBtn');

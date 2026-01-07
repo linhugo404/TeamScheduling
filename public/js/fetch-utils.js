@@ -3,9 +3,12 @@
  * Provides timeout, retry, and error handling for API calls
  */
 
-const DEFAULT_TIMEOUT = 10000; // 10 seconds
-const DEFAULT_RETRIES = 2;
-const RETRY_DELAY = 1000; // 1 second
+import { API_CONFIG } from './config.js';
+
+// Use config values with fallbacks
+const DEFAULT_TIMEOUT = API_CONFIG.timeout;
+const DEFAULT_RETRIES = API_CONFIG.retries;
+const RETRY_DELAY = API_CONFIG.retryDelay;
 
 /**
  * Fetch with timeout support

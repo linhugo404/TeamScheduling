@@ -512,12 +512,12 @@
     </div>
 
     <!-- Booking Modal -->
-    <div id="bookingModal" class="modal">
+    <div id="bookingModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="modalTitle">Book Office Space</h2>
-                <button class="modal-close" onclick="closeModal()">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <button class="modal-close" onclick="closeModal()" aria-label="Close booking modal">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <line x1="18" y1="6" x2="6" y2="18"></line>
                         <line x1="6" y1="6" x2="18" y2="18"></line>
                     </svg>
@@ -582,12 +582,12 @@
     </div>
 
     <!-- Team Modal -->
-    <div id="teamModal" class="modal">
+    <div id="teamModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="teamModalTitle">
         <div class="modal-content modal-small">
             <div class="modal-header">
-                <h2>Add Team</h2>
-                <button class="modal-close" onclick="closeTeamModal()">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <h2 id="teamModalTitle">Add Team</h2>
+                <button class="modal-close" onclick="closeTeamModal()" aria-label="Close team modal">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <line x1="18" y1="6" x2="6" y2="18"></line>
                         <line x1="6" y1="6" x2="18" y2="18"></line>
                     </svg>
@@ -656,12 +656,12 @@
     </div>
 
     <!-- Location Modal -->
-    <div id="locationModal" class="modal">
+    <div id="locationModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="locationModalTitle">
         <div class="modal-content modal-small">
             <div class="modal-header">
                 <h2 id="locationModalTitle">Add Location</h2>
-                <button class="modal-close" onclick="closeLocationModal()">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <button class="modal-close" onclick="closeLocationModal()" aria-label="Close location modal">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <line x1="18" y1="6" x2="6" y2="18"></line>
                         <line x1="6" y1="6" x2="18" y2="18"></line>
                     </svg>
@@ -696,12 +696,12 @@
     </div>
 
     <!-- Desk Modal -->
-    <div id="deskModal" class="modal">
+    <div id="deskModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="deskModalTitle">
         <div class="modal-content modal-small">
             <div class="modal-header">
                 <h2 id="deskModalTitle">Add Desk</h2>
-                <button class="modal-close" onclick="closeDeskModal()">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <button class="modal-close" onclick="closeDeskModal()" aria-label="Close desk modal">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <line x1="18" y1="6" x2="6" y2="18"></line>
                         <line x1="6" y1="6" x2="18" y2="18"></line>
                     </svg>
@@ -938,8 +938,8 @@
         </div>
     </div>
 
-    <!-- Toast Notifications -->
-    <div id="toastContainer" class="toast-container"></div>
+    <!-- Toast Notifications - aria-live for screen reader announcements -->
+    <div id="toastContainer" class="toast-container" role="status" aria-live="polite" aria-atomic="true"></div>
 
     <!-- Team Hover Tooltip -->
     <div id="teamTooltip" class="team-tooltip">

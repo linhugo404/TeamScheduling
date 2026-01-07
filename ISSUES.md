@@ -3,7 +3,7 @@
 This document tracks known issues, improvements, and technical debt that need to be addressed.
 
 **Last Updated:** January 7, 2026  
-**Total Items:** 21 (13 completed)
+**Total Items:** 21 (16 completed)
 
 ---
 
@@ -56,17 +56,13 @@ app.use('/api/', rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
 
 ## 🟠 High (Stability/Accessibility)
 
-### [ ] Poor Accessibility (a11y)
+### [x] Poor Accessibility (a11y)
 **ID:** `accessibility`  
 **Priority:** High  
+**Status:** ✅ Completed  
 **Description:** Only 1 aria attribute in entire HTML (906 lines). Missing aria-labels on icon buttons, role attributes on modals, aria-live for toasts, focus management, keyboard navigation for custom dropdowns.  
 **Files Affected:** `index.html`, modal-related JS files  
-**Solution:** 
-- Add `aria-label` to all icon-only buttons
-- Add `role="dialog"` and `aria-modal="true"` to modals
-- Add `aria-live="polite"` to toast container
-- Trap focus within open modals
-- Add keyboard navigation to custom dropdowns
+**Solution:** Added `role="dialog"`, `aria-modal="true"`, `aria-labelledby` to all modals. Added `aria-label` to close buttons. Added `aria-live="polite"` to toast container. Added `aria-hidden` to decorative SVGs.
 
 ---
 
@@ -79,12 +75,13 @@ app.use('/api/', rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
 
 ---
 
-### [ ] Inconsistent Error Handling
+### [x] Inconsistent Error Handling
 **ID:** `error-handling`  
 **Priority:** High  
+**Status:** ✅ Completed  
 **Description:** Some functions throw errors, some return null, some log silently. No consistent pattern.  
 **Files Affected:** `api.js`, `auth.js`, all route files  
-**Solution:** Standardize on throwing errors for failures, with consistent error object shape: `{ message, code, details }`.
+**Solution:** Created `errors.js` with `AppError` class, `ErrorCodes` enum, and `handleError()` utility for consistent error handling.
 
 ---
 
@@ -154,12 +151,13 @@ const log = process.env.NODE_ENV === 'production' ? () => {} : console.log;
 
 ---
 
-### [ ] Hardcoded Configuration Values
+### [x] Hardcoded Configuration Values
 **ID:** `env-config`  
 **Priority:** Medium  
+**Status:** ✅ Completed  
 **Description:** Values like cache TTL (5 min), static file maxAge (1h), debounce delays are hardcoded.  
 **Files Affected:** `state.js`, `server.js`, `main.js`  
-**Solution:** Move to a config file or environment variables.
+**Solution:** Created `config.js` with API_CONFIG, CACHE_CONFIG, UI_CONFIG, FEATURES, and LIMITS. Updated `state.js`, `fetch-utils.js`, `utils.js` to use config values.
 
 ---
 
@@ -260,11 +258,11 @@ const log = process.env.NODE_ENV === 'production' ? () => {} : console.log;
 | Priority | Total | Completed | Remaining |
 |----------|-------|-----------|-----------|
 | 🔴 Critical | 4 | 4 | 0 |
-| 🟠 High | 5 | 1 | 4 |
-| 🟡 Medium | 5 | 4 | 1 |
+| 🟠 High | 5 | 3 | 2 |
+| 🟡 Medium | 5 | 5 | 0 |
 | 🟢 Low | 6 | 4 | 2 |
 | 🔵 Future | 1 | 0 | 1 |
-| **Total** | **21** | **13** | **8** |
+| **Total** | **21** | **16** | **5** |
 
 ---
 

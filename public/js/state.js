@@ -3,6 +3,8 @@
  * Central state management for the Office Booking System
  */
 
+import { CACHE_CONFIG } from './config.js';
+
 export const state = {
     currentDate: new Date(),
     currentLocation: null, // Will be set to first available location on load
@@ -18,8 +20,8 @@ export const state = {
     bookingsCache: {} // "locationId:year-month" -> { bookings: [], fetchedAt: Date }
 };
 
-// Cache settings
-export const BOOKINGS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+// Cache settings - now from config
+export const BOOKINGS_CACHE_TTL = CACHE_CONFIG.bookingsTTL;
 
 // DOM Elements - populated after DOM is ready
 export const elements = {

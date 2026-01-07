@@ -46,7 +46,7 @@ const elements = {
 // Initialization
 // ============================================
 
-async function init() {
+async function initApp() {
     loadTheme();
     await loadData();
     await loadBookingsForMonth(); // Load bookings for current month
@@ -251,11 +251,18 @@ function getWeatherForDate(dateStr) {
 // ============================================
 
 function initSocket() {
-    // Prompt for name on first visit
-    state.myName = localStorage.getItem('userName');
-    if (!state.myName) {
-        state.myName = prompt('Enter your name for live presence:') || 'Anonymous';
-        localStorage.setItem('userName', state.myName);
+    // Use authenticated user's name
+    const currentUser = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+    if (currentUser) {
+        state.myName = currentUser.name;
+        state.myUserId = currentUser.id;
+    } else {
+        // Fallback for non-authenticated mode
+        state.myName = localStorage.getItem('userName');
+        if (!state.myName) {
+            state.myName = prompt('Enter your name for live presence:') || 'Anonymous';
+            localStorage.setItem('userName', state.myName);
+        }
     }
     
     // Connect to Socket.IO
@@ -1757,6 +1764,9 @@ function closeTeamModal() {
     document.getElementById('teamManagerImage').value = '';
     document.getElementById('teamFormSubmitBtn').textContent = 'Add Team';
     document.querySelector('#teamModal .modal-header h2').textContent = 'Add Team';
+    
+    // Reset manager selector
+    clearSelectedManager();
 }
 
 // ============================================
@@ -2003,6 +2013,11 @@ async function switchView(viewName) {
         setTimeout(() => {
             renderLocationsList();
         }, 200);
+    }
+    
+    // Initialize team roles view
+    if (viewName === 'teamRoles') {
+        initTeamRolesView();
     }
 }
 
@@ -2264,7 +2279,311 @@ function loadDesks() {
 }
 
 // ============================================
+// Team Roles (Azure AD Integration)
+// ============================================
+
+// Store allowed team lead roles
+let allowedTeamRoles = JSON.parse(localStorage.getItem('allowedTeamRoles') || '[]');
+let azureADJobTitles = [];
+let azureADManagers = []; // Cached managers from Azure AD
+
+async function initTeamRolesView() {
+    const jobTitlesList = document.getElementById('jobTitlesList');
+    const refreshBtn = document.getElementById('refreshRolesBtn');
+    
+    if (!jobTitlesList) return;
+    
+    // Show loading
+    jobTitlesList.innerHTML = '<div class="loading-spinner">Loading job titles from Azure AD...</div>';
+    
+    // Fetch job titles from Azure AD
+    if (typeof fetchAllJobTitles === 'function') {
+        try {
+            azureADJobTitles = await fetchAllJobTitles();
+            renderJobTitlesList();
+            renderAllowedRolesList();
+        } catch (error) {
+            console.error('Failed to fetch job titles:', error);
+            jobTitlesList.innerHTML = '<p class="empty-state">Failed to load job titles. Please try again.</p>';
+        }
+    } else {
+        jobTitlesList.innerHTML = '<p class="empty-state">Azure AD authentication required.</p>';
+    }
+    
+    // Refresh button
+    if (refreshBtn) {
+        refreshBtn.onclick = async () => {
+            await initTeamRolesView();
+            showToast('Job titles refreshed from Azure AD', 'success');
+        };
+    }
+}
+
+function renderJobTitlesList() {
+    const container = document.getElementById('jobTitlesList');
+    if (!container) return;
+    
+    if (azureADJobTitles.length === 0) {
+        container.innerHTML = '<p class="empty-state">No job titles found in Azure AD.</p>';
+        return;
+    }
+    
+    container.innerHTML = azureADJobTitles.map(title => {
+        const isSelected = allowedTeamRoles.includes(title);
+        return `
+            <button class="job-title-chip ${isSelected ? 'selected' : ''}" 
+                    onclick="toggleTeamRole('${escapeHtml(title)}')"
+                    title="${isSelected ? 'Click to remove' : 'Click to add as allowed role'}">
+                ${isSelected ? `
+                    <svg class="chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                ` : ''}
+                ${escapeHtml(title)}
+            </button>
+        `;
+    }).join('');
+}
+
+function renderAllowedRolesList() {
+    const container = document.getElementById('allowedRolesList');
+    if (!container) return;
+    
+    if (allowedTeamRoles.length === 0) {
+        container.innerHTML = '<p class="empty-state">No roles selected yet. Click on job titles above to allow them.</p>';
+        return;
+    }
+    
+    container.innerHTML = allowedTeamRoles.map(role => `
+        <span class="allowed-role-chip">
+            ${escapeHtml(role)}
+            <button class="remove-role" onclick="toggleTeamRole('${escapeHtml(role)}')" title="Remove">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </span>
+    `).join('');
+}
+
+function toggleTeamRole(title) {
+    const index = allowedTeamRoles.indexOf(title);
+    if (index >= 0) {
+        allowedTeamRoles.splice(index, 1);
+    } else {
+        allowedTeamRoles.push(title);
+    }
+    
+    // Sort alphabetically
+    allowedTeamRoles.sort((a, b) => a.localeCompare(b));
+    
+    // Save to localStorage
+    localStorage.setItem('allowedTeamRoles', JSON.stringify(allowedTeamRoles));
+    
+    // Re-render both lists
+    renderJobTitlesList();
+    renderAllowedRolesList();
+    
+    // Clear cached managers so they're refetched with new roles
+    azureADManagers = [];
+}
+
+// Escape HTML to prevent XSS
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Fetch managers from Azure AD based on allowed roles
+async function fetchAzureADManagers() {
+    if (azureADManagers.length > 0) {
+        return azureADManagers; // Return cached
+    }
+    
+    if (allowedTeamRoles.length === 0) {
+        return [];
+    }
+    
+    if (typeof fetchUsersByJobTitles === 'function') {
+        try {
+            azureADManagers = await fetchUsersByJobTitles(allowedTeamRoles);
+            return azureADManagers;
+        } catch (error) {
+            console.error('Failed to fetch managers:', error);
+            return [];
+        }
+    }
+    return [];
+}
+
+// Get direct reports count for a manager
+async function getManagerDirectReportsCount(managerId) {
+    if (typeof fetchDirectReports === 'function') {
+        try {
+            const reports = await fetchDirectReports(managerId);
+            return reports.length;
+        } catch (error) {
+            console.error('Failed to fetch direct reports:', error);
+            return 0;
+        }
+    }
+    return 0;
+}
+
+// Manager selector for team form
+let managerDropdownOpen = false;
+
+async function openManagerSelector() {
+    const dropdown = document.getElementById('managerDropdown');
+    const btn = document.getElementById('selectManagerBtn');
+    
+    if (!dropdown) return;
+    
+    if (managerDropdownOpen) {
+        closeManagerDropdown();
+        return;
+    }
+    
+    // Show loading state
+    btn.disabled = true;
+    btn.innerHTML = `
+        <svg class="spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;animation:spin 1s linear infinite">
+            <circle cx="12" cy="12" r="10" stroke-opacity="0.25"></circle>
+            <path d="M12 2a10 10 0 0 1 10 10" stroke-opacity="1"></path>
+        </svg>
+        Loading managers...
+    `;
+    
+    // Fetch managers from Azure AD
+    const managers = await fetchAzureADManagers();
+    
+    btn.disabled = false;
+    btn.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+        </svg>
+        Select from Azure AD
+    `;
+    
+    if (managers.length === 0) {
+        if (allowedTeamRoles.length === 0) {
+            dropdown.innerHTML = `
+                <div style="padding: 1rem; text-align: center; color: var(--text-muted);">
+                    <p>No team lead roles configured.</p>
+                    <p style="font-size: 0.85rem; margin-top: 0.5rem;">Go to Settings → Team Roles to select which job titles can lead teams.</p>
+                </div>
+            `;
+        } else {
+            dropdown.innerHTML = `
+                <div style="padding: 1rem; text-align: center; color: var(--text-muted);">
+                    No managers found with the allowed job titles.
+                </div>
+            `;
+        }
+    } else {
+        dropdown.innerHTML = managers.sort((a, b) => a.displayName.localeCompare(b.displayName)).map(manager => `
+            <div class="manager-option" onclick="selectManager('${manager.id}', '${escapeHtml(manager.displayName)}', '${escapeHtml(manager.jobTitle || '')}', '${escapeHtml(manager.mail || manager.userPrincipalName || '')}')">
+                <div class="manager-option-avatar">
+                    <span>${getInitials(manager.displayName)}</span>
+                </div>
+                <div class="manager-option-info">
+                    <div class="manager-option-name">${escapeHtml(manager.displayName)}</div>
+                    <div class="manager-option-title">${escapeHtml(manager.jobTitle || 'No title')}</div>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    dropdown.classList.add('open');
+    managerDropdownOpen = true;
+    
+    // Close on outside click
+    setTimeout(() => {
+        document.addEventListener('click', closeManagerDropdownOnClickOutside);
+    }, 0);
+}
+
+function closeManagerDropdown() {
+    const dropdown = document.getElementById('managerDropdown');
+    if (dropdown) {
+        dropdown.classList.remove('open');
+    }
+    managerDropdownOpen = false;
+    document.removeEventListener('click', closeManagerDropdownOnClickOutside);
+}
+
+function closeManagerDropdownOnClickOutside(e) {
+    const dropdown = document.getElementById('managerDropdown');
+    const btn = document.getElementById('selectManagerBtn');
+    if (dropdown && btn && !dropdown.contains(e.target) && !btn.contains(e.target)) {
+        closeManagerDropdown();
+    }
+}
+
+async function selectManager(id, name, title, email) {
+    closeManagerDropdown();
+    
+    // Update hidden field
+    document.getElementById('teamManagerId').value = id;
+    
+    // Update display
+    const display = document.getElementById('selectedManagerDisplay');
+    const avatar = document.getElementById('selectedManagerAvatar');
+    const nameEl = document.getElementById('selectedManagerName');
+    const metaEl = document.getElementById('selectedManagerMeta');
+    const managerInput = document.getElementById('teamManager');
+    const selectBtn = document.getElementById('selectManagerBtn');
+    
+    nameEl.textContent = name;
+    avatar.innerHTML = `<span>${getInitials(name)}</span>`;
+    
+    // Show loading state for direct reports
+    metaEl.textContent = 'Loading team size...';
+    display.style.display = 'flex';
+    selectBtn.style.display = 'none';
+    managerInput.style.display = 'none';
+    managerInput.value = name;
+    
+    // Fetch photo
+    if (typeof fetchUserPhotoById === 'function') {
+        const photo = await fetchUserPhotoById(id);
+        if (photo) {
+            avatar.innerHTML = `<img src="${photo}" alt="${name}">`;
+            document.getElementById('teamManagerImage').value = photo;
+        }
+    }
+    
+    // Fetch direct reports count
+    const directReportsCount = await getManagerDirectReportsCount(id);
+    metaEl.textContent = `${title} • ${directReportsCount} direct reports`;
+    
+    // Auto-fill member count
+    const memberCountInput = document.getElementById('teamMemberCountInput');
+    const memberCountHint = document.getElementById('memberCountHint');
+    
+    if (directReportsCount > 0) {
+        memberCountInput.value = directReportsCount;
+        memberCountHint.textContent = `Auto-filled from Azure AD (${directReportsCount} direct reports)`;
+        memberCountHint.style.display = 'block';
+    }
+}
+
+function clearSelectedManager() {
+    document.getElementById('teamManagerId').value = '';
+    document.getElementById('selectedManagerDisplay').style.display = 'none';
+    document.getElementById('selectManagerBtn').style.display = 'flex';
+    document.getElementById('teamManager').style.display = 'block';
+    document.getElementById('teamManager').value = '';
+    document.getElementById('teamManagerImage').value = '';
+    document.getElementById('memberCountHint').style.display = 'none';
+}
+
+// ============================================
 // Initialize Application
 // ============================================
 
-document.addEventListener('DOMContentLoaded', init);
+// App initialization is triggered by auth.js after successful login
+// See initApp() function

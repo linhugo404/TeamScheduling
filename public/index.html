@@ -11,9 +11,34 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="/socket.io/socket.io.js"></script>
+    <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+    <script src="auth.js"></script>
 </head>
 <body>
-    <div class="app">
+    <!-- Login Overlay -->
+    <div id="loginOverlay" class="login-overlay visible">
+        <div class="login-container">
+            <div class="login-logo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                    <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                </svg>
+            </div>
+            <h1 class="login-title">Office Booking System</h1>
+            <p class="login-subtitle">Sign in with your work account to continue</p>
+            <button class="login-button" onclick="signIn()">
+                <svg viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+                    <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+                    <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+                    <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+                </svg>
+                Sign in with Microsoft
+            </button>
+        </div>
+    </div>
+
+    <div class="app" style="display: none;">
         <!-- Mobile Header -->
         <header class="mobile-header">
             <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Open menu">
@@ -79,6 +104,23 @@
                 </button>
             </div>
             
+            <!-- User Info -->
+            <div id="userInfo" class="user-info">
+                <div id="userAvatar" class="user-avatar">
+                    <span>?</span>
+                </div>
+                <div class="user-details">
+                    <span id="userName" class="user-name">Loading...</span>
+                    <button class="sign-out-btn" onclick="signOut()" title="Sign out">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                            <polyline points="16 17 21 12 16 7"></polyline>
+                            <line x1="21" y1="12" x2="9" y2="12"></line>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            
             <div class="location-selector">
                 <label>Location</label>
                 <select id="locationSelect">
@@ -128,6 +170,15 @@
                                 <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
                             </svg>
                             Teams
+                        </button>
+                        <button class="nav-item nav-subitem" data-view="teamRoles">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M22 11h-6"></path>
+                                <path d="M19 8v6"></path>
+                            </svg>
+                            Team Roles
                         </button>
                         <button class="nav-item nav-subitem" data-view="locations">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -360,6 +411,38 @@
                     <!-- Holidays populated by JS -->
                 </div>
             </div>
+
+            <!-- Team Roles View -->
+            <div id="teamRolesView" class="view">
+                <header class="view-header">
+                    <h1>Team Lead Roles</h1>
+                    <button id="refreshRolesBtn" class="btn btn-secondary">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c1.66 0 3-4.03 3-9s-1.34-9-3-9m0 18c-1.66 0-3-4.03-3-9s1.34-9 3-9"></path>
+                        </svg>
+                        Refresh from Azure AD
+                    </button>
+                </header>
+                <p class="view-description">Select which job titles from Azure AD are allowed to lead teams. When creating a team, only people with these job titles will appear in the manager dropdown.</p>
+                
+                <div class="team-roles-container">
+                    <div class="roles-section">
+                        <h3>Available Job Titles</h3>
+                        <p class="section-hint">These are all job titles found in your Azure AD organization.</p>
+                        <div id="jobTitlesList" class="job-titles-list">
+                            <div class="loading-spinner">Loading job titles from Azure AD...</div>
+                        </div>
+                    </div>
+                    
+                    <div class="roles-section">
+                        <h3>Allowed Team Lead Roles</h3>
+                        <p class="section-hint">People with these job titles can be selected as team managers.</p>
+                        <div id="allowedRolesList" class="allowed-roles-list">
+                            <p class="empty-state">No roles selected yet. Click on job titles above to allow them.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </main>
     </div>
 
@@ -446,17 +529,42 @@
                     <input type="text" id="teamName" required placeholder="e.g. Engineering">
                 </div>
                 <div class="form-group">
-                    <label for="teamManager">Manager / SM</label>
-                    <input type="text" id="teamManager" placeholder="e.g. John Smith">
+                    <label>Manager / SM</label>
+                    <div class="manager-selector">
+                        <input type="hidden" id="teamManagerId">
+                        <button type="button" id="selectManagerBtn" class="btn btn-secondary" onclick="openManagerSelector()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="12" cy="7" r="4"></circle>
+                            </svg>
+                            Select from Azure AD
+                        </button>
+                        <div id="managerDropdown" class="manager-dropdown"></div>
+                        <div id="selectedManagerDisplay" class="manager-selected" style="display:none">
+                            <div id="selectedManagerAvatar" class="manager-option-avatar"></div>
+                            <div class="manager-selected-info">
+                                <span id="selectedManagerName" class="manager-selected-name"></span>
+                                <span id="selectedManagerMeta" class="manager-selected-meta"></span>
+                            </div>
+                            <button type="button" class="clear-btn" onclick="clearSelectedManager()" title="Clear selection">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                            </button>
+                        </div>
+                        <input type="text" id="teamManager" placeholder="Or type name manually" style="margin-top: 0.5rem">
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="teamManagerImage">Manager Photo URL</label>
-                    <input type="url" id="teamManagerImage" placeholder="https://example.com/photo.jpg">
-                    <span class="hint">Paste an image URL, or leave blank for auto-generated avatar</span>
+                    <input type="url" id="teamManagerImage" placeholder="Auto-filled from Azure AD or paste URL">
+                    <span class="hint">Auto-populated when selecting from Azure AD</span>
                 </div>
                 <div class="form-group">
                     <label for="teamMemberCountInput">Number of Team Members</label>
                     <input type="number" id="teamMemberCountInput" min="0" max="50" value="1" required>
+                    <span id="memberCountHint" class="hint" style="display:none"></span>
                 </div>
                 <div class="form-group">
                     <label for="teamColor">Team Color</label>

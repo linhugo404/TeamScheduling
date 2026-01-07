@@ -125,6 +125,31 @@ app.use(express.static('public', {
     }
 }));
 
+// Auth callback route - serve index.html for SPA auth redirect
+app.get('/auth/callback', (req, res) => {
+    res.sendFile('index.html', { root: 'public' });
+});
+
+// Auth config endpoint - serves Azure AD config to frontend
+app.get('/api/auth/config', (req, res) => {
+    const clientId = process.env.AZURE_AD_CLIENT_ID;
+    const tenantId = process.env.AZURE_AD_TENANT_ID;
+    
+    if (!clientId || !tenantId) {
+        return res.status(503).json({ 
+            error: 'Azure AD not configured',
+            configured: false 
+        });
+    }
+    
+    res.json({
+        configured: true,
+        clientId: clientId,
+        authority: `https://login.microsoftonline.com/${tenantId}`,
+        redirectUri: `${req.protocol}://${req.get('host')}/auth/callback`
+    });
+});
+
 // Helper function to convert snake_case to camelCase
 function toCamelCase(obj) {
     if (Array.isArray(obj)) {

@@ -4348,3 +4348,33 @@ form {
     animation: spin 1s linear infinite;
 }
 
+/* Overbooking Warning */
+.overbooking-warning {
+    display: flex;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md);
+    background: rgba(245, 166, 35, 0.15);
+    border: 1px solid var(--warning);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.overbooking-warning svg {
+    width: 24px;
+    height: 24px;
+    stroke: var(--warning);
+    flex-shrink: 0;
+}
+
+.overbooking-warning strong {
+    color: var(--warning);
+    display: block;
+    margin-bottom: var(--spacing-xs);
+}
+
+.overbooking-warning p {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin: 0;
+}
+

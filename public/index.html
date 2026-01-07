@@ -486,8 +486,20 @@
                 </div>
                 
                 <div class="form-group">
-                    <label for="bookingNotes">Notes (optional)</label>
+                    <label for="bookingNotes">Notes <span id="notesRequiredLabel" style="display:none; color: var(--danger);">(Required - explain overbooking)</span></label>
                     <textarea id="bookingNotes" rows="2" placeholder="Any additional notes..."></textarea>
+                </div>
+                
+                <div id="overbookingWarning" class="overbooking-warning" style="display:none;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                    <div>
+                        <strong>Capacity Exceeded</strong>
+                        <p id="overbookingMessage">This booking will exceed the daily capacity. Please provide a reason in the notes.</p>
+                    </div>
                 </div>
                 
                 <div class="form-actions">

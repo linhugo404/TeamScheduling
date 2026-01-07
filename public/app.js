@@ -1009,29 +1009,85 @@ function handleTeamSelect() {
         
         let infoHtml = `<strong>${memberCount}</strong> people · Manager: <strong>${manager}</strong>`;
         
-        // Check capacity
-        if (state.selectedDate) {
-            const location = state.locations.find(l => l.id === state.currentLocation);
-            const capacity = location ? location.capacity : 21;
-            
-            const dayBookings = state.bookings.filter(
-                b => b.date === state.selectedDate && b.locationId === state.currentLocation
-            );
-            const used = dayBookings.reduce((sum, b) => sum + getBookingPeopleCount(b), 0);
-            const available = capacity - used;
-            
-            if (memberCount > available) {
-                infoHtml += `<br><span style="color: var(--danger)">⚠ Exceeds ${available} available spots</span>`;
-            }
-        }
+        // Check capacity and handle overbooking
+        checkOverbooking();
         
         document.getElementById('teamMemberCount').innerHTML = infoHtml;
+    }
+}
+
+function checkOverbooking() {
+    const teamId = document.getElementById('teamSelect').value;
+    const team = state.teams.find(t => t.id === teamId);
+    const bookingId = document.getElementById('bookingId').value;
+    
+    if (!team || !state.selectedDate) {
+        hideOverbookingWarning();
+        return false;
+    }
+    
+    const memberCount = team.memberCount || 0;
+    const location = state.locations.find(l => l.id === state.currentLocation);
+    const capacity = location ? location.capacity : 21;
+    
+    // Get current bookings for this day, excluding the booking being edited
+    const dayBookings = state.bookings.filter(
+        b => b.date === state.selectedDate && 
+             b.locationId === state.currentLocation &&
+             b.id !== bookingId
+    );
+    const used = dayBookings.reduce((sum, b) => sum + getBookingPeopleCount(b), 0);
+    const newTotal = used + memberCount;
+    
+    if (newTotal > capacity) {
+        showOverbookingWarning(newTotal, capacity, newTotal - capacity);
+        return true;
+    } else {
+        hideOverbookingWarning();
+        return false;
+    }
+}
+
+function showOverbookingWarning(total, capacity, excess) {
+    const warning = document.getElementById('overbookingWarning');
+    const message = document.getElementById('overbookingMessage');
+    const notesLabel = document.getElementById('notesRequiredLabel');
+    const notesField = document.getElementById('bookingNotes');
+    
+    if (warning) {
+        warning.style.display = 'flex';
+        message.textContent = `This will bring the total to ${total} people (${excess} over the ${capacity} capacity). Please explain in the notes why this overbooking is needed.`;
+    }
+    if (notesLabel) {
+        notesLabel.style.display = 'inline';
+    }
+    if (notesField) {
+        notesField.required = true;
+        notesField.placeholder = 'Required: Explain why overbooking is needed...';
+    }
+}
+
+function hideOverbookingWarning() {
+    const warning = document.getElementById('overbookingWarning');
+    const notesLabel = document.getElementById('notesRequiredLabel');
+    const notesField = document.getElementById('bookingNotes');
+    
+    if (warning) {
+        warning.style.display = 'none';
+    }
+    if (notesLabel) {
+        notesLabel.style.display = 'none';
+    }
+    if (notesField) {
+        notesField.required = false;
+        notesField.placeholder = 'Any additional notes...';
     }
 }
 
 function closeModal() {
     elements.bookingModal.classList.remove('active');
     state.selectedDate = null;
+    hideOverbookingWarning();
 }
 
 function updateAvailableSpotsHint(dateStr) {

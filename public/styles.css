@@ -4378,3 +4378,21 @@ form {
     margin: 0;
 }
 
+/* Booking notes display */
+.booking-note-icon {
+    margin-left: var(--spacing-xs);
+    cursor: help;
+}
+
+.booking-notes {
+    width: 100%;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: var(--radius-sm);
+    margin-top: var(--spacing-xs);
+}
+
+.booking-item {
+    flex-wrap: wrap;
+}
+

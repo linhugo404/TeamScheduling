@@ -1137,13 +1137,16 @@ function renderDayBookings(dateStr) {
         // Use current team name and member count, fallback to booking data
         const displayName = team ? team.name : booking.teamName;
         const displayCount = team ? team.memberCount : booking.peopleCount;
+        const hasNotes = booking.notes && booking.notes.trim().length > 0;
         
         return `
             <div class="booking-item" style="background: ${color}; border-left: none;">
                 <div class="booking-info">
                     <span class="booking-team-name" style="color: white;">${displayName}</span>
                     <span class="booking-people" style="color: rgba(255,255,255,0.8);">${displayCount} people</span>
+                    ${hasNotes ? `<span class="booking-note-icon" title="${booking.notes.replace(/"/g, '&quot;')}">📝</span>` : ''}
                 </div>
+                ${hasNotes ? `<div class="booking-notes" style="color: rgba(255,255,255,0.9); font-size: 0.8rem; margin-top: 4px; font-style: italic;">"${booking.notes}"</div>` : ''}
                 <div class="calendar-sync-buttons">
                     <button class="sync-btn google" onclick="addToGoogleCalendar('${booking.id}')" title="Add to Google Calendar">
                         <svg viewBox="0 0 24 24" fill="currentColor">

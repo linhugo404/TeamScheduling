@@ -10,7 +10,7 @@ const express = require('express');
 // Mock Supabase before requiring routes
 jest.mock('../../config/supabase', () => require('../mocks/supabase.mock'));
 
-const { supabase, mockData, resetMockData } = require('../mocks/supabase.mock');
+const { supabase, mockData, resetMockData, setSimulateError, clearSimulateError } = require('../mocks/supabase.mock');
 const { router: bookingsRouter, initBookingsRoutes } = require('../../routes/bookings');
 
 // Create test app
@@ -193,6 +193,138 @@ describe('DELETE /api/bookings/:id', () => {
             .expect(404);
 
         expect(response.body.error).toBe('Booking not found');
+    });
+});
+
+describe('GET /api/bookings/:id/ics', () => {
+    beforeEach(() => {
+        resetMockData();
+        mockData.bookings = [
+            { id: 'booking1', date: '2024-01-15', team_id: 'team1', team_name: 'Engineering', people_count: 10, location_id: 'loc1', notes: 'Test notes' }
+        ];
+    });
+
+    test('generates ICS file for valid booking', async () => {
+        const response = await request(app)
+            .get('/api/bookings/booking1/ics')
+            .expect('Content-Type', /text\/calendar/)
+            .expect(200);
+
+        expect(response.text).toContain('BEGIN:VCALENDAR');
+        expect(response.text).toContain('BEGIN:VEVENT');
+        expect(response.text).toContain('Engineering - Office Booking');
+        expect(response.text).toContain('END:VCALENDAR');
+    });
+
+    test('includes booking details in ICS', async () => {
+        const response = await request(app)
+            .get('/api/bookings/booking1/ics')
+            .expect(200);
+
+        expect(response.text).toContain('DTSTART;VALUE=DATE:20240115');
+        expect(response.text).toContain('UID:booking1@officebooking');
+    });
+
+    test('returns 404 for non-existent booking', async () => {
+        const response = await request(app)
+            .get('/api/bookings/nonexistent/ics')
+            .expect(404);
+
+        expect(response.body.error).toBe('Booking not found');
+    });
+});
+
+describe('GET /api/bookings with month filter', () => {
+    beforeEach(() => {
+        resetMockData();
+        mockData.bookings = [
+            { id: '1', date: '2024-01-15', team_id: 'team1', location_id: 'loc1', people_count: 10 },
+            { id: '2', date: '2024-01-25', team_id: 'team1', location_id: 'loc1', people_count: 10 },
+            { id: '3', date: '2024-02-05', team_id: 'team1', location_id: 'loc1', people_count: 10 }
+        ];
+    });
+
+    test('filters by year and month', async () => {
+        const response = await request(app)
+            .get('/api/bookings?year=2024&month=0')
+            .expect(200);
+
+        expect(response.body.length).toBe(2);
+    });
+
+    test('supports both location and locationId parameters', async () => {
+        const response1 = await request(app)
+            .get('/api/bookings?location=loc1')
+            .expect(200);
+
+        const response2 = await request(app)
+            .get('/api/bookings?locationId=loc1')
+            .expect(200);
+
+        expect(response1.body.length).toBe(response2.body.length);
+    });
+});
+
+describe('POST /api/bookings with overbooking', () => {
+    beforeEach(() => {
+        resetMockData();
+        // Fill capacity with existing bookings
+        mockData.bookings = [
+            { id: '1', date: '2024-01-15', team_id: 'team2', people_count: 45, location_id: 'loc1' }
+        ];
+    });
+
+    test('rejects overbooking without notes', async () => {
+        const booking = {
+            date: '2024-01-15',
+            teamId: 'team1',
+            teamName: 'Engineering',
+            peopleCount: 10,
+            locationId: 'loc1',
+            notes: ''
+        };
+
+        const response = await request(app)
+            .post('/api/bookings')
+            .send(booking)
+            .expect(400);
+
+        expect(response.body.error).toContain('Exceeds capacity');
+    });
+
+    test('allows overbooking with notes', async () => {
+        const booking = {
+            date: '2024-01-15',
+            teamId: 'team1',
+            teamName: 'Engineering',
+            peopleCount: 10,
+            locationId: 'loc1',
+            notes: 'Approved by management for special event'
+        };
+
+        const response = await request(app)
+            .post('/api/bookings')
+            .send(booking)
+            .expect(201);
+
+        expect(response.body.notes).toContain('[OVERBOOKED]');
+    });
+});
+
+describe('Error handling', () => {
+    afterEach(() => {
+        clearSimulateError();
+        resetMockData();
+    });
+
+    test('GET /api/bookings returns 500 on database error', async () => {
+        setSimulateError(new Error('Database connection failed'));
+
+        const response = await request(app)
+            .get('/api/bookings')
+            .expect(500);
+
+        expect(response.body.error).toBe('Failed to fetch bookings');
     });
 });
 

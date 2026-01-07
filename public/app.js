@@ -762,8 +762,9 @@ function renderCalendar(isLoading = false) {
                 // Use current team name and member count, fallback to booking data
                 const displayName = team ? team.name : booking.teamName;
                 const displayCount = team ? team.memberCount : booking.peopleCount;
+                const isOverbooked = booking.isOverbooked;
                 dayContent += `
-                    <div class="booking-chip" 
+                    <div class="booking-chip ${isOverbooked ? 'overbooked' : ''}" 
                          draggable="true"
                          data-booking-id="${booking.id}"
                          data-team-id="${teamId}"
@@ -771,7 +772,9 @@ function renderCalendar(isLoading = false) {
                          ondragstart="handleDragStart(event, this.dataset.bookingId)"
                          ondragend="handleDragEnd(event)"
                          onmouseenter="showTeamTooltip(event, this.dataset.teamId)"
-                         onmouseleave="hideTeamTooltip()">
+                         onmouseleave="hideTeamTooltip()"
+                         title="${isOverbooked ? '⚠️ Overbooked' : ''}">
+                        ${isOverbooked ? '<span class="chip-overbooked-icon">⚠️</span>' : ''}
                         <span>${displayName}</span>
                         <span style="opacity: 0.8">(${displayCount})</span>
                     </div>
@@ -1138,10 +1141,12 @@ function renderDayBookings(dateStr) {
         const displayName = team ? team.name : booking.teamName;
         const displayCount = team ? team.memberCount : booking.peopleCount;
         const hasNotes = booking.notes && booking.notes.trim().length > 0;
+        const isOverbooked = booking.isOverbooked;
         
         return `
-            <div class="booking-item" style="background: ${color}; border-left: none;">
+            <div class="booking-item ${isOverbooked ? 'overbooked' : ''}" style="background: ${color}; border-left: none;">
                 <div class="booking-info">
+                    ${isOverbooked ? `<span class="overbooked-icon" title="This booking exceeded capacity">⚠️</span>` : ''}
                     <span class="booking-team-name" style="color: white;">${displayName}</span>
                     <span class="booking-people" style="color: rgba(255,255,255,0.8);">${displayCount} people</span>
                     ${hasNotes ? `<span class="booking-note-icon" title="${booking.notes.replace(/"/g, '&quot;')}">📝</span>` : ''}

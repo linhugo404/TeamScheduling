@@ -287,6 +287,7 @@ app.post('/api/bookings', async (req, res) => {
         const currentTotal = (existingBookings || []).reduce((sum, b) => sum + b.people_count, 0);
         
         // Allow overbooking if notes are provided (with explanation)
+        let isOverbooked = false;
         if (currentTotal + peopleCount > location.capacity) {
             if (!notes || notes.trim().length === 0) {
                 return res.status(400).json({ 
@@ -294,6 +295,7 @@ app.post('/api/bookings', async (req, res) => {
                 });
             }
             // Overbooking allowed with notes - continue
+            isOverbooked = true;
             console.log(`Overbooking allowed for ${date}: ${currentTotal + peopleCount}/${location.capacity} with note: ${notes}`);
         }
         
@@ -305,6 +307,7 @@ app.post('/api/bookings', async (req, res) => {
             people_count: parseInt(peopleCount),
             location_id: locationId,
             notes: notes || '',
+            is_overbooked: isOverbooked,
             created_at: new Date().toISOString()
         };
         

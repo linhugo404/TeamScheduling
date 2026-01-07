@@ -4396,3 +4396,26 @@ form {
     flex-wrap: wrap;
 }
 
+/* Overbooked indicator */
+.booking-item.overbooked {
+    border: 2px solid var(--warning) !important;
+    box-shadow: 0 0 8px rgba(245, 166, 35, 0.4);
+}
+
+.overbooked-icon {
+    margin-right: var(--spacing-xs);
+    font-size: 1rem;
+    cursor: help;
+}
+
+/* Overbooked chip on calendar */
+.booking-chip.overbooked {
+    border: 2px solid var(--warning) !important;
+    box-shadow: 0 0 6px rgba(245, 166, 35, 0.5);
+}
+
+.chip-overbooked-icon {
+    font-size: 0.65rem;
+    margin-right: 2px;
+}
+

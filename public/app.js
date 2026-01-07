@@ -1190,7 +1190,16 @@ async function handleBookingSubmit(e) {
     const peopleCount = parseInt(document.getElementById('peopleCount').value);
     const notes = document.getElementById('bookingNotes').value;
     
+    // Validate team selection
+    if (!teamId) {
+        showToast('Please select a team', 'error');
+        document.getElementById('teamSelect').focus();
+        return;
+    }
+    
     // Validate notes for overbooking
+    console.log('Submitting booking:', { isOverbooking, notes, teamId, date, peopleCount });
+    
     if (isOverbooking && (!notes || notes.trim().length === 0)) {
         showToast('Please provide a note explaining the overbooking', 'error');
         document.getElementById('bookingNotes').focus();
@@ -1214,6 +1223,7 @@ async function handleBookingSubmit(e) {
             showToast('Booking updated successfully', 'success');
         } else {
             // Create new booking
+            console.log('Sending to server:', { date, teamId, teamName: team?.name, peopleCount, locationId: state.currentLocation, notes });
             const response = await fetch('/api/bookings', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1227,8 +1237,11 @@ async function handleBookingSubmit(e) {
                 })
             });
             
+            console.log('Server response status:', response.status);
+            
             if (!response.ok) {
                 const error = await response.json();
+                console.log('Server error:', error);
                 throw new Error(error.error);
             }
             

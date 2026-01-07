@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS bookings (
     people_count INTEGER NOT NULL,
     location_id TEXT REFERENCES locations(id) ON DELETE CASCADE,
     notes TEXT DEFAULT '',
+    is_overbooked BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

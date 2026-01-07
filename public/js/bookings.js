@@ -7,6 +7,8 @@ import { state, elements } from './state.js';
 import { formatDateStr, formatDisplayDate, showToast, getBookingPeopleCount, getInitials, escapeHtml } from './utils.js';
 import { createBooking, updateBooking, deleteBookingApi, invalidateBookingsCache, loadBookingsForMonth } from './api.js';
 import { renderCalendar } from './calendar.js';
+import { validateBooking, showValidationErrors } from './validation.js';
+import { setButtonLoading } from './loading.js';
 
 // Track if currently overbooking
 let isOverbooking = false;
@@ -247,9 +249,9 @@ export async function handleBookingSubmit(e) {
     const teamId = elements.teamSelect?.value;
     const notes = document.getElementById('bookingNotes')?.value || '';
     
-    // Validation
-    if (!teamId) {
-        showToast('Please select a team', 'error');
+    // Frontend validation
+    const validation = validateBooking({ date, teamId, notes });
+    if (!showValidationErrors(validation, showToast)) {
         return;
     }
     
@@ -261,6 +263,10 @@ export async function handleBookingSubmit(e) {
     
     const team = state.teams.find(t => t.id === teamId);
     const peopleCount = team ? team.memberCount : 1;
+    
+    // Get submit button and set loading state
+    const submitBtn = elements.bookingForm?.querySelector('button[type="submit"]');
+    const restoreBtn = setButtonLoading(submitBtn, bookingId ? 'Updating...' : 'Creating...');
     
     try {
         if (bookingId) {
@@ -302,6 +308,8 @@ export async function handleBookingSubmit(e) {
         
     } catch (error) {
         showToast(error.message, 'error');
+    } finally {
+        restoreBtn();
     }
 }
 

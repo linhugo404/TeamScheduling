@@ -3,7 +3,7 @@
 This document tracks known issues, improvements, and technical debt that need to be addressed.
 
 **Last Updated:** January 7, 2026  
-**Total Items:** 21 (10 completed)
+**Total Items:** 21 (13 completed)
 
 ---
 
@@ -44,12 +44,13 @@ app.use('/api/', rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
 
 ---
 
-### [ ] No Frontend Input Validation
+### [x] No Frontend Input Validation
 **ID:** `input-validation`  
 **Priority:** Critical  
+**Status:** ✅ Completed  
 **Description:** Data goes straight to API without validation. Relying solely on server-side validation.  
 **Files Affected:** `api.js`, `bookings.js`, `teams.js`, `locations.js`  
-**Solution:** Add validation before API calls (check required fields, data types, string lengths).
+**Solution:** Added `validation.js` with reusable validators for bookings, teams, and locations. Applied to all form submissions.
 
 ---
 
@@ -87,17 +88,13 @@ app.use('/api/', rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
 
 ---
 
-### [ ] No Request Timeout/Retry
+### [x] No Request Timeout/Retry
 **ID:** `request-timeout`  
 **Priority:** High  
+**Status:** ✅ Completed  
 **Description:** Fetch calls have no timeout. If server hangs, UI hangs forever.  
 **Files Affected:** `api.js`, `auth.js`  
-**Solution:** Add AbortController with timeout:
-```javascript
-const controller = new AbortController();
-const timeout = setTimeout(() => controller.abort(), 10000);
-const response = await fetch(url, { signal: controller.signal });
-```
+**Solution:** Added `fetch-utils.js` with `fetchWithRetry()` - 10s timeout, 2 retries with exponential backoff. All API calls now use this wrapper.
 
 ---
 
@@ -138,12 +135,13 @@ const log = process.env.NODE_ENV === 'production' ? () => {} : console.log;
 
 ---
 
-### [ ] Missing Loading States
+### [x] Missing Loading States
 **ID:** `loading-states`  
 **Priority:** Medium  
+**Status:** ✅ Completed  
 **Description:** Only drag-drop has loading animation. Save/delete operations have no visual feedback.  
 **Files Affected:** `bookings.js`, `teams.js`, `locations.js`  
-**Solution:** Add loading spinner/disabled state to buttons during async operations.
+**Solution:** Added `loading.js` with `setButtonLoading()` utility. All form submit buttons now show spinner and "Saving..." text during async operations.
 
 ---
 
@@ -261,12 +259,12 @@ const log = process.env.NODE_ENV === 'production' ? () => {} : console.log;
 
 | Priority | Total | Completed | Remaining |
 |----------|-------|-----------|-----------|
-| 🔴 Critical | 4 | 3 | 1 |
-| 🟠 High | 5 | 0 | 5 |
-| 🟡 Medium | 5 | 3 | 2 |
+| 🔴 Critical | 4 | 4 | 0 |
+| 🟠 High | 5 | 1 | 4 |
+| 🟡 Medium | 5 | 4 | 1 |
 | 🟢 Low | 6 | 4 | 2 |
 | 🔵 Future | 1 | 0 | 1 |
-| **Total** | **21** | **10** | **11** |
+| **Total** | **21** | **13** | **8** |
 
 ---
 

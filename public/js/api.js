@@ -4,14 +4,14 @@
  */
 
 import { state, BOOKINGS_CACHE_TTL } from './state.js';
+import { apiGet, apiPost, apiPut, apiDelete } from './fetch-utils.js';
 
 /**
  * Load all initial data from the server
  */
 export async function loadData() {
     try {
-        const response = await fetch('/api/data');
-        const data = await response.json();
+        const data = await apiGet('/api/data');
         
         state.locations = data.locations || [];
         state.teams = data.teams || [];
@@ -45,8 +45,7 @@ export async function loadBookingsForMonth(forceRefresh = false) {
     }
     
     try {
-        const response = await fetch(`/api/bookings?year=${year}&month=${month}&location=${location}`);
-        const bookings = await response.json();
+        const bookings = await apiGet(`/api/bookings?year=${year}&month=${month}&location=${location}`);
         
         // Update cache
         state.bookingsCache[cacheKey] = {
@@ -76,192 +75,83 @@ export function invalidateBookingsCache(year, month, location) {
  * Create a new booking
  */
 export async function createBooking(bookingData) {
-    const response = await fetch('/api/bookings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bookingData)
-    });
-    
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to create booking');
-    }
-    
-    return response.json();
+    return apiPost('/api/bookings', bookingData);
 }
 
 /**
  * Update an existing booking
  */
 export async function updateBooking(id, updates) {
-    const response = await fetch(`/api/bookings/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates)
-    });
-    
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to update booking');
-    }
-    
-    return response.json();
+    return apiPut(`/api/bookings/${id}`, updates);
 }
 
 /**
  * Delete a booking
  */
 export async function deleteBookingApi(id) {
-    const response = await fetch(`/api/bookings/${id}`, {
-        method: 'DELETE'
-    });
-    
-    if (!response.ok) {
-        throw new Error('Failed to delete booking');
-    }
-    
-    return response.json();
+    return apiDelete(`/api/bookings/${id}`);
 }
 
 /**
  * Create a new team
  */
 export async function createTeam(teamData) {
-    const response = await fetch('/api/teams', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(teamData)
-    });
-    
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to create team');
-    }
-    
-    return response.json();
+    return apiPost('/api/teams', teamData);
 }
 
 /**
  * Update a team
  */
 export async function updateTeam(id, updates) {
-    const response = await fetch(`/api/teams/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates)
-    });
-    
-    if (!response.ok) {
-        throw new Error('Failed to update team');
-    }
-    
-    return response.json();
+    return apiPut(`/api/teams/${id}`, updates);
 }
 
 /**
  * Delete a team
  */
 export async function deleteTeamApi(id) {
-    const response = await fetch(`/api/teams/${id}`, {
-        method: 'DELETE'
-    });
-    
-    if (!response.ok) {
-        throw new Error('Failed to delete team');
-    }
-    
-    return response.json();
+    return apiDelete(`/api/teams/${id}`);
 }
 
 /**
  * Create a new location
  */
 export async function createLocation(locationData) {
-    const response = await fetch('/api/locations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(locationData)
-    });
-    
-    if (!response.ok) {
-        throw new Error('Failed to create location');
-    }
-    
-    return response.json();
+    return apiPost('/api/locations', locationData);
 }
 
 /**
  * Update a location
  */
 export async function updateLocation(id, updates) {
-    const response = await fetch(`/api/locations/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates)
-    });
-    
-    if (!response.ok) {
-        throw new Error('Failed to update location');
-    }
-    
-    return response.json();
+    return apiPut(`/api/locations/${id}`, updates);
 }
 
 /**
  * Delete a location
  */
 export async function deleteLocationApi(id) {
-    const response = await fetch(`/api/locations/${id}`, {
-        method: 'DELETE'
-    });
-    
-    if (!response.ok) {
-        throw new Error('Failed to delete location');
-    }
-    
-    return response.json();
+    return apiDelete(`/api/locations/${id}`);
 }
 
 /**
  * Fetch holidays from external API
  */
 export async function fetchHolidaysFromApi(year) {
-    const response = await fetch(`/api/holidays/fetch/${year}`);
-    if (!response.ok) {
-        throw new Error('Failed to fetch holidays');
-    }
-    return response.json();
+    return apiGet(`/api/holidays/fetch/${year}`);
 }
 
 /**
  * Save holidays to database
  */
 export async function saveHolidays(holidays) {
-    const response = await fetch('/api/holidays', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ holidays })
-    });
-    
-    if (!response.ok) {
-        throw new Error('Failed to save holidays');
-    }
-    
-    return response.json();
+    return apiPost('/api/holidays', { holidays });
 }
 
 /**
  * Delete a holiday
  */
 export async function deleteHolidayApi(date) {
-    const response = await fetch(`/api/holidays/${date}`, {
-        method: 'DELETE'
-    });
-    
-    if (!response.ok) {
-        throw new Error('Failed to delete holiday');
-    }
-    
-    return response.json();
+    return apiDelete(`/api/holidays/${date}`);
 }
 

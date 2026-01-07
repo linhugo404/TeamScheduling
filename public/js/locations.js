@@ -7,6 +7,8 @@ import { state, elements } from './state.js';
 import { showToast, escapeHtml } from './utils.js';
 import { createLocation, updateLocation, deleteLocationApi } from './api.js';
 import { renderTeamSelect } from './teams.js';
+import { validateLocation, showValidationErrors } from './validation.js';
+import { setButtonLoading } from './loading.js';
 
 /**
  * Render location select dropdown (sorted alphabetically)
@@ -71,10 +73,15 @@ export async function handleLocationSubmit(e) {
     const capacity = parseInt(document.getElementById('locationCapacity')?.value) || 21;
     const floors = parseInt(document.getElementById('locationFloors')?.value) || 1;
     
-    if (!name) {
-        showToast('Please enter a location name', 'error');
+    // Frontend validation
+    const validation = validateLocation({ name, address, capacity, floors });
+    if (!showValidationErrors(validation, showToast)) {
         return;
     }
+    
+    // Get submit button and set loading state
+    const submitBtn = document.getElementById('locationFormSubmitBtn');
+    const restoreBtn = setButtonLoading(submitBtn, locationId ? 'Updating...' : 'Creating...');
     
     try {
         if (locationId) {
@@ -98,6 +105,8 @@ export async function handleLocationSubmit(e) {
         
     } catch (error) {
         showToast(error.message || 'Failed to save location', 'error');
+    } finally {
+        restoreBtn();
     }
 }
 

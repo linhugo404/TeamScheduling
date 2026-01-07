@@ -7,6 +7,8 @@ import { state, elements } from './state.js';
 import { showToast, getAvatarHTML, getInitials, adjustColor, escapeHtml } from './utils.js';
 import { createTeam, updateTeam, deleteTeamApi, invalidateBookingsCache, loadBookingsForMonth } from './api.js';
 import { renderCalendar } from './calendar.js';
+import { validateTeam, showValidationErrors } from './validation.js';
+import { setButtonLoading } from './loading.js';
 
 /**
  * Render team select dropdown (sorted alphabetically)
@@ -168,7 +170,6 @@ export function renderTeamsList() {
 export async function handleTeamSubmit(e) {
     e.preventDefault();
     
-    const form = elements.teamForm;
     const teamId = document.getElementById('teamId')?.value;
     const name = document.getElementById('teamName')?.value;
     const color = document.getElementById('teamColor')?.value;
@@ -177,10 +178,15 @@ export async function handleTeamSubmit(e) {
     const managerImage = document.getElementById('teamManagerImage')?.value || '';
     const locationId = document.getElementById('teamLocation')?.value;
     
-    if (!name || !locationId) {
-        showToast('Please fill in all required fields', 'error');
+    // Frontend validation
+    const validation = validateTeam({ name, color, memberCount, manager, locationId });
+    if (!showValidationErrors(validation, showToast)) {
         return;
     }
+    
+    // Get submit button and set loading state
+    const submitBtn = document.getElementById('teamFormSubmitBtn');
+    const restoreBtn = setButtonLoading(submitBtn, teamId ? 'Updating...' : 'Creating...');
     
     try {
         if (teamId) {
@@ -202,6 +208,8 @@ export async function handleTeamSubmit(e) {
         
     } catch (error) {
         showToast(error.message, 'error');
+    } finally {
+        restoreBtn();
     }
 }
 

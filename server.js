@@ -142,11 +142,19 @@ app.get('/api/auth/config', (req, res) => {
         });
     }
     
+    // Determine protocol - trust proxy headers in production (Render, Heroku, etc.)
+    const protocol = req.get('x-forwarded-proto') || req.protocol;
+    const host = req.get('host');
+    
+    // Force HTTPS in production (non-localhost)
+    const isLocalhost = host.includes('localhost') || host.includes('127.0.0.1');
+    const finalProtocol = isLocalhost ? protocol : 'https';
+    
     res.json({
         configured: true,
         clientId: clientId,
         authority: `https://login.microsoftonline.com/${tenantId}`,
-        redirectUri: `${req.protocol}://${req.get('host')}/auth/callback`
+        redirectUri: `${finalProtocol}://${host}/auth/callback`
     });
 });
 

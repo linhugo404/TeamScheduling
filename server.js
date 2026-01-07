@@ -38,6 +38,10 @@ const deskBookingsRoutes = require('./routes/deskBookings');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Trust proxy - required for rate limiting behind reverse proxies (Render, Heroku, etc.)
+// This tells Express to trust X-Forwarded-* headers from the first proxy
+app.set('trust proxy', 1);
+
 // Create HTTP server and Socket.IO
 const httpServer = http.createServer(app);
 const io = new Server(httpServer, { cors: { origin: true, credentials: true } });

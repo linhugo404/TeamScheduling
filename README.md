@@ -8,7 +8,6 @@ A modern, real-time web application for managing office space bookings, team sch
 [![Azure AD](https://img.shields.io/badge/Azure%20AD-SSO-0078D4?logo=microsoft&logoColor=white)](https://azure.microsoft.com/)
 [![Socket.IO](https://img.shields.io/badge/Socket.IO-Real--time-010101?logo=socket.io&logoColor=white)](https://socket.io/)
 [![Test Coverage](https://img.shields.io/badge/Coverage-95%25-brightgreen)](coverage/)
-[![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
 
 ---
 
@@ -527,10 +526,6 @@ Set these in the Render dashboard under **Environment**:
 - Restart server or wait for the window to reset
 
 ---
-
-## 📄 License
-
-MIT License — feel free to use, modify, and distribute.
 
 ---
 

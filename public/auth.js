@@ -190,10 +190,11 @@ async function getIdToken() {
     } catch (error) {
         if (error instanceof msal.InteractionRequiredAuthError) {
             try {
-                const response = await msalInstance.acquireTokenRedirect(tokenRequest);
-                return response?.idToken;
-            } catch (redirectError) {
-                console.error('ID token acquisition failed:', redirectError);
+                const response = await msalInstance.acquireTokenPopup(tokenRequest);
+                return response.idToken;
+            } catch (popupError) {
+                console.error('ID token acquisition failed:', popupError);
+                signIn();
                 return null;
             }
         }

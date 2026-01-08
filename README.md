@@ -44,7 +44,6 @@ A modern, real-time web application for managing office space bookings, team sch
 - **Team Management** — Manager photos, member counts, custom colors
 - **Capacity Tracking** — Real-time warnings when approaching limits
 - **Public Holidays** — Auto-fetch South African holidays from Nager.Date API
-- **Weather Forecast** — 7-day forecast using Open-Meteo API
 - **Calendar Export** — ICS files for Outlook, Google Calendar, Apple Calendar
 
 ### 🪑 Desk Booking & Floor Plans
@@ -330,7 +329,6 @@ office-booking/
 | **Security** | Helmet, express-rate-limit |
 | **Testing** | Jest, Supertest |
 | **Frontend** | Vanilla ES6 Modules |
-| **Weather** | Open-Meteo API |
 
 ### Database Schema
 
@@ -541,5 +539,4 @@ MIT License — feel free to use, modify, and distribute.
 - [Supabase](https://supabase.com) — PostgreSQL backend
 - [Azure AD](https://azure.microsoft.com) — Enterprise authentication
 - [Socket.IO](https://socket.io) — Real-time communication
-- [Open-Meteo](https://open-meteo.com) — Weather API
 - [Nager.Date](https://date.nager.at) — Public holidays API

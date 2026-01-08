@@ -944,6 +944,44 @@ body::before {
     }
 }
 
+/* Skeleton loading state for initial calendar load */
+.calendar-grid.calendar-skeleton .calendar-day.skeleton {
+    min-height: 100px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    position: relative;
+    overflow: hidden;
+}
+
+.calendar-grid.calendar-skeleton .calendar-day.skeleton::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: 24px;
+    height: 24px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+}
+
+.calendar-grid.calendar-skeleton .calendar-day.skeleton::after {
+    content: '';
+    position: absolute;
+    top: 40px;
+    left: 8px;
+    right: 8px;
+    height: 16px;
+    background: linear-gradient(90deg, var(--bg-tertiary) 25%, var(--bg-card-hover) 50%, var(--bg-tertiary) 75%);
+    background-size: 200% 100%;
+    border-radius: var(--radius-sm);
+    animation: shimmer 1.5s infinite;
+}
+
+.calendar-grid.calendar-skeleton .calendar-day.skeleton.weekend {
+    opacity: 0.5;
+}
+
 /* Loading state for calendar */
 .calendar-grid.loading .calendar-day:not(.other-month):not(.weekend):not(.holiday)::after {
     content: '';
@@ -4045,6 +4083,64 @@ form {
     background: var(--bg-tertiary);
     padding: 2px 8px;
     border-radius: var(--radius-sm);
+}
+
+/* ============================================
+   Auth Loading Overlay (shown while checking auth)
+   ============================================ */
+.auth-loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--bg-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10001;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.auth-loading-overlay.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.auth-loading-container {
+    text-align: center;
+}
+
+.auth-loading-logo {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto var(--spacing-lg);
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 32px rgba(217, 92, 2, 0.3);
+}
+
+.auth-loading-logo svg {
+    width: 32px;
+    height: 32px;
+    stroke: white;
+}
+
+.auth-loading-spinner {
+    width: 32px;
+    height: 32px;
+    margin: var(--spacing-lg) auto;
+    border: 3px solid var(--border-color);
+    border-top-color: var(--accent-primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+.auth-loading-text {
+    color: var(--text-muted);
+    font-size: 0.9rem;
 }
 
 /* ============================================

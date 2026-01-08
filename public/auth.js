@@ -426,8 +426,18 @@ async function onUserAuthenticated(account) {
     }
 }
 
-// Show login screen
+// Hide auth loading overlay
+function hideAuthLoading() {
+    const authLoading = document.getElementById('authLoadingOverlay');
+    if (authLoading) {
+        authLoading.classList.remove('visible');
+    }
+}
+
+// Show login screen (only after auth check determines user needs to log in)
 function showLoginUI() {
+    hideAuthLoading();
+    
     const loginOverlay = document.getElementById('loginOverlay');
     if (loginOverlay) {
         loginOverlay.classList.add('visible');
@@ -442,6 +452,8 @@ function showLoginUI() {
 
 // Hide login screen
 function hideLoginUI() {
+    hideAuthLoading();
+    
     const loginOverlay = document.getElementById('loginOverlay');
     if (loginOverlay) {
         loginOverlay.classList.remove('visible');

@@ -78,8 +78,22 @@
         </div>
     </noscript>
     
-    <!-- Login Overlay -->
-    <div id="loginOverlay" class="login-overlay visible">
+    <!-- Auth Loading Overlay (shown while checking auth status) -->
+    <div id="authLoadingOverlay" class="auth-loading-overlay visible">
+        <div class="auth-loading-container">
+            <div class="auth-loading-logo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                    <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                </svg>
+            </div>
+            <div class="auth-loading-spinner"></div>
+            <p class="auth-loading-text">Loading...</p>
+        </div>
+    </div>
+
+    <!-- Login Overlay (shown only when login is required) -->
+    <div id="loginOverlay" class="login-overlay">
         <div class="login-container">
             <div class="login-logo">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -312,8 +326,42 @@
                         <div class="calendar-day-header weekend">Sat</div>
                         <div class="calendar-day-header weekend">Sun</div>
                     </div>
-                    <div id="calendarGrid" class="calendar-grid">
-                        <!-- Calendar days populated by JS -->
+                    <div id="calendarGrid" class="calendar-grid calendar-skeleton">
+                        <!-- Skeleton loading state (replaced by JS) -->
+                        <div class="calendar-day skeleton"></div>
+                        <div class="calendar-day skeleton"></div>
+                        <div class="calendar-day skeleton"></div>
+                        <div class="calendar-day skeleton"></div>
+                        <div class="calendar-day skeleton"></div>
+                        <div class="calendar-day skeleton weekend"></div>
+                        <div class="calendar-day skeleton weekend"></div>
+                        <div class="calendar-day skeleton"></div>
+                        <div class="calendar-day skeleton"></div>
+                        <div class="calendar-day skeleton"></div>
+                        <div class="calendar-day skeleton"></div>
+                        <div class="calendar-day skeleton"></div>
+                        <div class="calendar-day skeleton weekend"></div>
+                        <div class="calendar-day skeleton weekend"></div>
+                        <div class="calendar-day skeleton"></div>
+                        <div class="calendar-day skeleton"></div>
+                        <div class="calendar-day skeleton"></div>
+                        <div class="calendar-day skeleton"></div>
+                        <div class="calendar-day skeleton"></div>
+                        <div class="calendar-day skeleton weekend"></div>
+                        <div class="calendar-day skeleton weekend"></div>
+                        <div class="calendar-day skeleton"></div>
+                        <div class="calendar-day skeleton"></div>
+                        <div class="calendar-day skeleton"></div>
+                        <div class="calendar-day skeleton"></div>
+                        <div class="calendar-day skeleton"></div>
+                        <div class="calendar-day skeleton weekend"></div>
+                        <div class="calendar-day skeleton weekend"></div>
+                        <div class="calendar-day skeleton"></div>
+                        <div class="calendar-day skeleton"></div>
+                        <div class="calendar-day skeleton"></div>
+                        <div class="calendar-day skeleton"></div>
+                        <div class="calendar-day skeleton"></div>
+                        <div class="calendar-day skeleton weekend"></div>
                     </div>
                 </div>
                 

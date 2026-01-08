@@ -148,6 +148,8 @@ function renderCalendarGrid(year, month, monthBookings, capacity, today, isLoadi
         html += `<div class="${classes.join(' ')}" onclick="openBookingModal('${dateStr}')" ${dropHandlers}>${dayContent}</div>`;
     }
     
+    // Remove skeleton class and set content
+    grid.classList.remove('calendar-skeleton');
     grid.innerHTML = html;
 }
 

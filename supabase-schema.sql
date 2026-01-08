@@ -126,6 +126,15 @@ CREATE TABLE IF NOT EXISTS floor_elements (
 CREATE INDEX IF NOT EXISTS idx_floor_elements_location ON floor_elements(location_id);
 
 -- ============================================
+-- SETTINGS TABLE (Application configuration)
+-- ============================================
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value JSONB NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ============================================
 -- ROW LEVEL SECURITY (Optional but recommended)
 -- ============================================
 -- Enable RLS on all tables (you can customize policies later)
@@ -146,4 +155,6 @@ CREATE POLICY "Allow all on public_holidays" ON public_holidays FOR ALL USING (t
 CREATE POLICY "Allow all on desks" ON desks FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all on desk_bookings" ON desk_bookings FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all on floor_elements" ON floor_elements FOR ALL USING (true) WITH CHECK (true);
+ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all on settings" ON settings FOR ALL USING (true) WITH CHECK (true);
 

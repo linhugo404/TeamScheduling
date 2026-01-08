@@ -45,18 +45,4 @@ export function toggleTheme() {
     localStorage.setItem('theme', newTheme);
 }
 
-/**
- * Reset to system preference (clear manual override)
- */
-export function resetToSystemTheme() {
-    localStorage.removeItem('theme');
-    document.documentElement.setAttribute('data-theme', getSystemTheme());
-}
-
-/**
- * Get current theme
- */
-export function getCurrentTheme() {
-    return document.documentElement.getAttribute('data-theme') || 'dark';
-}
 

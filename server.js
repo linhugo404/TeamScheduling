@@ -33,6 +33,7 @@ const teamsRoutes = require('./routes/teams');
 const desksRoutes = require('./routes/desks');
 const floorElementsRoutes = require('./routes/floorElements');
 const deskBookingsRoutes = require('./routes/deskBookings');
+const settingsRoutes = require('./routes/settings');
 
 // Import middleware
 const { authenticate, optionalAuth } = require('./middleware/auth');
@@ -137,6 +138,7 @@ app.use('/api/teams', teamsRoutes);
 app.use('/api/desks', desksRoutes);
 app.use('/api/floor-elements', floorElementsRoutes);
 app.use('/api/desk-bookings', deskBookingsRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // QR Code check-in route (legacy path)
 app.get('/api/checkin/:qrCode', async (req, res) => {

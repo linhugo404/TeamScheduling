@@ -4,9 +4,49 @@
  */
 
 import { showToast, escapeHtml } from './utils.js';
+import { apiGet, apiPut } from './fetch-utils.js';
 
 // Allowed team roles (job titles that can lead teams)
-let allowedTeamRoles = JSON.parse(localStorage.getItem('allowedTeamRoles') || '[]');
+let allowedTeamRoles = [];
+let rolesLoaded = false;
+
+/**
+ * Load team roles from the database
+ */
+async function loadTeamRoles() {
+    if (rolesLoaded) return;
+    
+    try {
+        const response = await apiGet('/api/settings/team_roles');
+        if (response && response.value) {
+            allowedTeamRoles = response.value;
+        }
+        rolesLoaded = true;
+    } catch (error) {
+        console.error('Error loading team roles:', error);
+        // Fallback to localStorage for migration
+        const localRoles = localStorage.getItem('allowedTeamRoles');
+        if (localRoles) {
+            allowedTeamRoles = JSON.parse(localRoles);
+            // Migrate to database
+            await saveTeamRolesToDB(allowedTeamRoles);
+            localStorage.removeItem('allowedTeamRoles');
+        }
+        rolesLoaded = true;
+    }
+}
+
+/**
+ * Save team roles to the database
+ */
+async function saveTeamRolesToDB(roles) {
+    try {
+        await apiPut('/api/settings/team_roles', { value: roles });
+    } catch (error) {
+        console.error('Error saving team roles:', error);
+        showToast('Failed to save team roles', 'error');
+    }
+}
 
 /**
  * Get allowed team roles
@@ -18,15 +58,16 @@ export function getAllowedTeamRoles() {
 /**
  * Set allowed team roles
  */
-export function setAllowedTeamRoles(roles) {
+export async function setAllowedTeamRoles(roles) {
     allowedTeamRoles = roles;
-    localStorage.setItem('allowedTeamRoles', JSON.stringify(roles));
+    await saveTeamRolesToDB(roles);
 }
 
 /**
  * Initialize team roles view
  */
 export async function initTeamRolesView() {
+    await loadTeamRoles();
     await renderJobTitlesList();
     renderAllowedRolesList();
 }
@@ -83,9 +124,12 @@ function renderAvailableTitles() {
     }
     
     container.innerHTML = availableTitles.map(title => `
-        <div class="job-title-item" onclick="toggleTeamRole('${escapeHtml(title)}')">
+        <div class="job-title-item" data-role="${escapeHtml(title)}" onclick="toggleTeamRole('${escapeHtml(title)}', this)">
             <span>${escapeHtml(title)}</span>
-            <button class="add-role-btn" title="Add to allowed roles">+</button>
+            <button class="add-role-btn" title="Add to allowed roles">
+                <span class="btn-text">+</span>
+                <span class="btn-spinner-small"></span>
+            </button>
         </div>
     `).join('');
 }
@@ -106,38 +150,86 @@ export function renderAllowedRolesList() {
     const sortedRoles = [...allowedTeamRoles].sort((a, b) => a.localeCompare(b));
     
     container.innerHTML = sortedRoles.map(role => `
-        <div class="allowed-role-item">
+        <div class="allowed-role-item" data-role="${escapeHtml(role)}">
             <span>${escapeHtml(role)}</span>
-            <button class="remove-role-btn" onclick="toggleTeamRole('${escapeHtml(role)}')" title="Remove">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <button class="remove-role-btn" onclick="toggleTeamRole('${escapeHtml(role)}', this.parentElement)" title="Remove">
+                <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="18" y1="6" x2="6" y2="18"></line>
                     <line x1="6" y1="6" x2="18" y2="18"></line>
                 </svg>
+                <span class="btn-spinner-small"></span>
             </button>
         </div>
     `).join('');
 }
 
+// Track saving state to prevent double-clicks
+let isSaving = false;
+
 /**
- * Toggle a team role
+ * Toggle a team role with animation
  */
-export function toggleTeamRole(title) {
+export async function toggleTeamRole(title, element) {
+    // Prevent double-clicks
+    if (isSaving) return;
+    isSaving = true;
+    
+    // Add saving animation to the element
+    if (element) {
+        element.classList.add('saving');
+    }
+    
+    const isAdding = !allowedTeamRoles.includes(title);
     const idx = allowedTeamRoles.indexOf(title);
+    
     if (idx === -1) {
         allowedTeamRoles.push(title);
     } else {
         allowedTeamRoles.splice(idx, 1);
     }
     
-    setAllowedTeamRoles(allowedTeamRoles);
-    renderAvailableTitles();
-    renderAllowedRolesList();
+    try {
+        await setAllowedTeamRoles(allowedTeamRoles);
+        
+        // Add success animation before removing
+        if (element) {
+            element.classList.remove('saving');
+            element.classList.add('success');
+            
+            // Animate out
+            await new Promise(r => setTimeout(r, 300));
+        }
+        
+        renderAvailableTitles();
+        renderAllowedRolesList();
+        
+        // Show subtle toast
+        showToast(isAdding ? `Added "${title}" as team lead role` : `Removed "${title}" from team lead roles`, 'success');
+    } catch (error) {
+        // Revert on error
+        if (idx === -1) {
+            allowedTeamRoles.pop();
+        } else {
+            allowedTeamRoles.splice(idx, 0, title);
+        }
+        
+        if (element) {
+            element.classList.remove('saving');
+            element.classList.add('error');
+            await new Promise(r => setTimeout(r, 500));
+            element.classList.remove('error');
+        }
+    } finally {
+        isSaving = false;
+    }
 }
 
 /**
  * Fetch managers from Azure AD based on allowed roles
  */
 export async function fetchAzureADManagers() {
+    await loadTeamRoles();
+    
     if (allowedTeamRoles.length === 0) {
         return [];
     }

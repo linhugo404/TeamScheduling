@@ -4363,6 +4363,71 @@ form {
     height: 14px;
 }
 
+/* Team Role Toggle Animations */
+.job-title-item,
+.allowed-role-item {
+    transition: all 0.3s ease;
+}
+
+.job-title-item .btn-spinner-small,
+.allowed-role-item .btn-spinner-small {
+    display: none;
+    width: 14px;
+    height: 14px;
+    border: 2px solid transparent;
+    border-top-color: currentColor;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+.job-title-item.saving,
+.allowed-role-item.saving {
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+.job-title-item.saving .btn-text,
+.allowed-role-item.saving .btn-icon {
+    display: none;
+}
+
+.job-title-item.saving .btn-spinner-small,
+.allowed-role-item.saving .btn-spinner-small {
+    display: block;
+}
+
+.job-title-item.success,
+.allowed-role-item.success {
+    transform: scale(0.95);
+    opacity: 0;
+}
+
+.job-title-item.error,
+.allowed-role-item.error {
+    animation: shake 0.4s ease;
+    border-color: var(--danger) !important;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-5px); }
+    40%, 80% { transform: translateX(5px); }
+}
+
+.add-role-btn {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.remove-role-btn {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .empty-state {
     color: var(--text-muted);
     font-style: italic;

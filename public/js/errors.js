@@ -122,42 +122,4 @@ export function handleError(error, showToast, options = {}) {
     }
 }
 
-/**
- * Wrap an async function with error handling
- * @param {Function} fn - Async function to wrap
- * @param {Function} showToast - Toast notification function
- * @returns {Function} Wrapped function
- */
-export function withErrorHandling(fn, showToast) {
-    return async (...args) => {
-        try {
-            return await fn(...args);
-        } catch (error) {
-            handleError(error, showToast);
-            return null;
-        }
-    };
-}
-
-/**
- * Parse API error response into AppError
- * @param {Response} response - Fetch Response object
- * @returns {Promise<AppError>}
- */
-export async function parseApiError(response) {
-    try {
-        const data = await response.json();
-        return new AppError(
-            data.error || data.message || `HTTP ${response.status}`,
-            data.code || (response.status >= 500 ? ErrorCodes.SERVER_ERROR : ErrorCodes.VALIDATION_ERROR),
-            { status: response.status, ...data }
-        );
-    } catch {
-        return new AppError(
-            `HTTP ${response.status}`,
-            response.status >= 500 ? ErrorCodes.SERVER_ERROR : ErrorCodes.VALIDATION_ERROR,
-            { status: response.status }
-        );
-    }
-}
 

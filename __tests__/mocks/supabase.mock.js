@@ -16,8 +16,12 @@ const mockData = {
     public_holidays: [],
     desks: [],
     floor_elements: [],
-    desk_bookings: []
+    desk_bookings: [],
+    settings: []
 };
+
+// Track error state per table
+const tableErrors = {};
 
 // Reset mock data between tests
 const resetMockData = () => {
@@ -26,6 +30,20 @@ const resetMockData = () => {
     mockData.desks = [];
     mockData.floor_elements = [];
     mockData.desk_bookings = [];
+    mockData.settings = [];
+    // Clear table-specific errors
+    Object.keys(tableErrors).forEach(key => delete tableErrors[key]);
+};
+
+// Set mock data for a specific table (for test setup)
+const setMockData = (tableName, data) => {
+    if (data === 'error') {
+        // Special value to simulate errors for this table
+        tableErrors[tableName] = { message: 'Simulated database error' };
+    } else {
+        mockData[tableName] = data;
+        delete tableErrors[tableName];
+    }
 };
 
 // Create a chainable query builder mock
@@ -117,8 +135,13 @@ const createQueryBuilder = (tableName) => {
                 if (upsertData) {
                     const items = Array.isArray(upsertData) ? upsertData : [upsertData];
                     items.forEach(item => {
+                        // Determine the unique key field based on table
+                        const keyField = tableName === 'settings' ? 'key' : 
+                                        (item.id ? 'id' : 'date');
+                        const keyValue = item[keyField];
+                        
                         const existingIndex = mockData[tableName].findIndex(
-                            existing => existing.date === item.date
+                            existing => existing[keyField] === keyValue
                         );
                         if (existingIndex >= 0) {
                             mockData[tableName][existingIndex] = { ...mockData[tableName][existingIndex], ...item };
@@ -126,7 +149,8 @@ const createQueryBuilder = (tableName) => {
                             mockData[tableName].push(item);
                         }
                     });
-                    result = mockData[tableName];
+                    // Return the upserted items
+                    result = items;
                 }
 
                 // Handle update
@@ -182,7 +206,8 @@ const clearSimulateError = () => {
 };
 
 // Create error-throwing query builder
-const createErrorQueryBuilder = () => {
+const createErrorQueryBuilder = (errorToReturn = null) => {
+    const theError = errorToReturn || simulateError;
     const queryBuilder = {
         select: jest.fn(() => queryBuilder),
         insert: jest.fn(() => queryBuilder),
@@ -196,7 +221,7 @@ const createErrorQueryBuilder = () => {
         order: jest.fn(() => queryBuilder),
         single: jest.fn(() => queryBuilder),
         then: async (resolve) => {
-            resolve({ data: null, error: simulateError });
+            resolve({ data: null, error: theError });
         }
     };
     return queryBuilder;
@@ -205,8 +230,12 @@ const createErrorQueryBuilder = () => {
 // Mock Supabase client
 const supabaseMock = {
     from: jest.fn((tableName) => {
+        // Check for table-specific errors first
+        if (tableErrors[tableName]) {
+            return createErrorQueryBuilder(tableErrors[tableName]);
+        }
         if (simulateError) {
-            return createErrorQueryBuilder();
+            return createErrorQueryBuilder(simulateError);
         }
         return createQueryBuilder(tableName);
     }),
@@ -219,6 +248,7 @@ module.exports = {
     supabase: supabaseMock,
     mockData,
     resetMockData,
+    setMockData,
     setSimulateError,
     clearSimulateError
 };

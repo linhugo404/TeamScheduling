@@ -151,6 +151,19 @@ body::before {
     margin-bottom: var(--spacing-xl);
 }
 
+.logo-clickable {
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+}
+
+.logo-clickable:hover {
+    opacity: 0.8;
+}
+
+.logo-clickable:active {
+    opacity: 0.6;
+}
+
 .logo-icon {
     width: 44px;
     height: 44px;

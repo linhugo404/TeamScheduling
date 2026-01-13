@@ -10,7 +10,7 @@ import { state, elements, initElements } from './state.js';
 import { loadTheme, toggleTheme } from './theme.js';
 import { initSocket, joinCurrentRoom } from './socket.js';
 import { loadData, loadBookingsForMonth, invalidateBookingsCache } from './api.js';
-import { renderCalendar, navigateMonth, goToToday } from './calendar.js';
+import { renderCalendar, navigateMonth, goToToday, renderSkeletonCalendar } from './calendar.js';
 import { 
     openBookingModal, closeModal, handleBookingSubmit, 
     editBooking, deleteBooking, handleTeamSelect, renderDayBookings,
@@ -81,6 +81,14 @@ function setupEventListeners() {
     // Navigation - items with data-view attribute
     document.querySelectorAll('.nav-item[data-view]').forEach(item => {
         item.addEventListener('click', () => switchView(item.dataset.view));
+    });
+    
+    // Logo click - navigate to calendar
+    document.querySelectorAll('.logo-clickable').forEach(logo => {
+        logo.addEventListener('click', () => {
+            switchView('calendar');
+            closeMobileMenu(); // Close mobile menu if open
+        });
     });
     
     // Settings submenu toggle
@@ -191,7 +199,11 @@ function handleKeyboardNav(e) {
 async function handleLocationChange(e) {
     state.currentLocation = e.target.value;
     state.bookings = []; // Clear bookings to show loading state
-    renderCalendar(true); // Show loading state immediately
+    
+    // Show skeleton loader
+    elements.calendarGrid?.classList.add('calendar-skeleton');
+    renderSkeletonCalendar();
+    
     updateCapacityDisplay();
     renderTeamSelect();
     joinCurrentRoom();

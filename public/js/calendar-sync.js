@@ -19,13 +19,16 @@ export function addToOutlookCalendar(bookingId) {
     const body = encodeURIComponent(`Team: ${booking.teamName}\nPeople: ${booking.peopleCount}\nManager: ${team?.manager || 'N/A'}`);
     const locationName = encodeURIComponent(location?.name || 'Office');
     
-    // Outlook expects ISO 8601 format: YYYY-MM-DDTHH:MM:SS
-    // For all-day events, use 00:00:00 start and 23:59:59 end
-    const startDate = `${booking.date}T00:00:00`;
-    const endDate = `${booking.date}T23:59:59`;
+    // For all-day events in Outlook, the end date should be the next day at 00:00:00
+    const date = new Date(booking.date);
+    const nextDay = new Date(date);
+    nextDay.setDate(date.getDate() + 1);
     
-    // Use the Office 365 calendar path which works more reliably
-    const url = `https://outlook.office.com/calendar/0/deeplink/compose?path=/calendar/action/compose&rru=addevent&subject=${title}&body=${body}&location=${locationName}&startdt=${startDate}&enddt=${endDate}`;
+    const startDate = `${booking.date}T00:00:00`;
+    const endDate = `${nextDay.toISOString().split('T')[0]}T00:00:00`;
+    
+    // Use the Office 365 calendar path with allday parameter
+    const url = `https://outlook.office.com/calendar/0/deeplink/compose?path=/calendar/action/compose&rru=addevent&subject=${title}&body=${body}&location=${locationName}&startdt=${startDate}&enddt=${endDate}&allday=true`;
     
     window.open(url, '_blank');
 }

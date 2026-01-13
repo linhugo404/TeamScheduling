@@ -93,14 +93,15 @@ async function loadFloorPlanModule() {
     try {
         // Dynamically load the floor plan script
         await new Promise((resolve, reject) => {
-            const existing = document.querySelector('script[src="floor-plan.js"]');
+            // Remove any existing script to force reload
+            const existing = document.querySelector('script[src^="floor-plan.js"]');
             if (existing) {
-                resolve();
-                return;
+                existing.remove();
             }
             
             const script = document.createElement('script');
-            script.src = 'floor-plan.js';
+            // Add cache-busting timestamp to force fresh download
+            script.src = `floor-plan.js?v=${Date.now()}`;
             script.onload = resolve;
             script.onerror = reject;
             document.body.appendChild(script);

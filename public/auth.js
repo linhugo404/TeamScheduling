@@ -176,29 +176,44 @@ async function getAccessToken() {
 
 // Get ID token for backend API calls (has app client ID as audience)
 async function getIdToken() {
-    if (!msalInstance || !currentAccount) return null;
+    if (!msalInstance) {
+        console.error('getIdToken: MSAL instance not initialized');
+        return null;
+    }
+    
+    if (!currentAccount) {
+        console.error('getIdToken: No current account');
+        return null;
+    }
     
     // Request with openid scope to get ID token
+    // The ID token will have the client ID as the audience automatically
     const tokenRequest = {
         scopes: ['openid', 'profile', 'email'],
         account: currentAccount
     };
     
     try {
+        console.log('Attempting to acquire token silently...');
         const response = await msalInstance.acquireTokenSilent(tokenRequest);
+        console.log('Token acquired silently, ID token present:', !!response.idToken);
         return response.idToken;
     } catch (error) {
+        console.warn('Silent token acquisition failed:', error.errorCode || error.message);
+        
         if (error instanceof msal.InteractionRequiredAuthError) {
+            console.log('Interaction required, trying popup...');
             try {
                 const response = await msalInstance.acquireTokenPopup(tokenRequest);
+                console.log('Token acquired via popup, ID token present:', !!response.idToken);
                 return response.idToken;
             } catch (popupError) {
-                console.error('ID token acquisition failed:', popupError);
-                signIn();
+                console.error('ID token acquisition via popup failed:', popupError.errorCode || popupError.message);
+                // Don't automatically sign in - let the user retry
                 return null;
             }
         }
-        console.error('ID token acquisition error:', error);
+        console.error('ID token acquisition error:', error.errorCode || error.message);
         return null;
     }
 }
@@ -416,6 +431,9 @@ async function onUserAuthenticated(account) {
     window.currentUser = user;
     localStorage.setItem('employeeName', user.name);
     localStorage.setItem('employeeEmail', user.email);
+    if (user.photo) {
+        localStorage.setItem('employeePhoto', user.photo);
+    }
     
     // Update UI
     showUserUI(user);

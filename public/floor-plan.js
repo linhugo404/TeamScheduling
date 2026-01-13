@@ -78,7 +78,6 @@ function initDesksView() {
         
         deskForm.addEventListener('submit', handleDeskSubmit);
         deskBookingForm.addEventListener('submit', handleDeskBookingSubmit);
-        
         toggleEditBtn.addEventListener('click', toggleEditMode);
         
         // Desk type change handler
@@ -551,9 +550,23 @@ async function quickBookDesk(desk) {
     if (deskEl) deskEl.classList.add('booking');
     
     try {
+        // Get ID token for authentication
+        const token = window.getIdToken ? await window.getIdToken() : null;
+        console.log('Desk booking - Token:', token ? `Present (${token.substring(0, 20)}...)` : 'Missing');
+        if (!token) {
+            console.error('No ID token available. User may need to re-authenticate.');
+            showToast('Authentication required. Please refresh the page and sign in again.', 'error');
+            return;
+        }
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+            console.log('Authorization header set:', headers['Authorization'].substring(0, 30) + '...');
+        }
+        
         const response = await fetch('/api/desk-bookings', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({
                 deskId: desk.id,
                 date: deskState.selectedDate,
@@ -658,7 +671,17 @@ async function cancelBookingFromPopup(bookingId, deskId) {
     if (!confirm('Cancel this booking?')) return;
     
     try {
-        await fetch(`/api/desk-bookings/${bookingId}`, { method: 'DELETE' });
+        // Get ID token for authentication
+        const token = window.getIdToken ? await window.getIdToken() : null;
+        const headers = {};
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        await fetch(`/api/desk-bookings/${bookingId}`, { 
+            method: 'DELETE',
+            headers
+        });
         showToast('Booking cancelled', 'success');
         
         // Close popup
@@ -719,7 +742,17 @@ async function deleteSelectedElement() {
         // Floor element
         if (!confirm(`Delete this ${el.elementType}?`)) return;
         try {
-            await fetch(`/api/floor-elements/${el.id}`, { method: 'DELETE' });
+            // Get ID token for authentication
+            const token = window.getIdToken ? await window.getIdToken() : null;
+            const headers = {};
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+            
+            await fetch(`/api/floor-elements/${el.id}`, { 
+                method: 'DELETE',
+                headers
+            });
             showToast(`${el.elementType} deleted`, 'success');
             loadDesks();
         } catch (error) {
@@ -915,9 +948,16 @@ async function handleElementMouseUp(e) {
             const newHeight = parseInt(element.style.height) || 100;
             
             try {
+                // Get ID token for authentication
+                const token = window.getIdToken ? await window.getIdToken() : null;
+                const headers = { 'Content-Type': 'application/json' };
+                if (token) {
+                    headers['Authorization'] = `Bearer ${token}`;
+                }
+                
                 const response = await fetch(`/api/floor-elements/${dragState.elementId}`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers,
                     body: JSON.stringify({ x: newX, y: newY, width: newWidth, height: newHeight })
                 });
                 
@@ -1014,9 +1054,16 @@ function setupDeskDragging() {
             const newY = parseInt(deskEl.style.top);
             
             try {
+                // Get ID token for authentication
+                const token = window.getIdToken ? await window.getIdToken() : null;
+                const headers = { 'Content-Type': 'application/json' };
+                if (token) {
+                    headers['Authorization'] = `Bearer ${token}`;
+                }
+                
                 await fetch(`/api/desks/${deskId}`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers,
                     body: JSON.stringify({ x: newX, y: newY })
                 });
                 
@@ -1136,17 +1183,24 @@ async function handleDeskSubmit(e) {
     };
     
     try {
+        // Get ID token for authentication
+        const token = window.getIdToken ? await window.getIdToken() : null;
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        
         let response;
         if (editDeskId) {
             response = await fetch(`/api/desks/${editDeskId}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify(deskData)
             });
         } else {
             response = await fetch('/api/desks', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify({ ...deskData, x, y })
             });
         }
@@ -1173,7 +1227,17 @@ async function deleteDesk(deskId) {
     if (!confirm('Delete this desk? All bookings for this desk will also be deleted.')) return;
     
     try {
-        await fetch(`/api/desks/${deskId}`, { method: 'DELETE' });
+        // Get ID token for authentication
+        const token = window.getIdToken ? await window.getIdToken() : null;
+        const headers = {};
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        await fetch(`/api/desks/${deskId}`, { 
+            method: 'DELETE',
+            headers
+        });
         showToast('Desk deleted', 'success');
         loadDesks();
     } catch (error) {
@@ -1229,16 +1293,23 @@ async function handleRoomSubmit(e) {
     };
     
     try {
+        // Get ID token for authentication
+        const token = window.getIdToken ? await window.getIdToken() : null;
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        
         if (editRoomId) {
             await fetch(`/api/floor-elements/${editRoomId}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify(roomData)
             });
         } else {
             await fetch('/api/floor-elements', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify(roomData)
             });
         }
@@ -1274,11 +1345,18 @@ async function handleWallSubmit(e) {
     const editWallId = document.getElementById('editWallId').value;
     
     try {
+        // Get ID token for authentication
+        const token = window.getIdToken ? await window.getIdToken() : null;
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        
         if (editWallId) {
             // Update existing wall
             await fetch(`/api/floor-elements/${editWallId}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify({
                     width: length,
                     height: thickness,
@@ -1290,7 +1368,7 @@ async function handleWallSubmit(e) {
             // Add new wall
             await fetch('/api/floor-elements', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify({
                     type: 'wall',
                     locationId: state.currentLocation,
@@ -1355,16 +1433,23 @@ async function handleLabelSubmit(e) {
     };
     
     try {
+        // Get ID token for authentication
+        const token = window.getIdToken ? await window.getIdToken() : null;
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        
         if (editLabelId) {
             await fetch(`/api/floor-elements/${editLabelId}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify(labelData)
             });
         } else {
             await fetch('/api/floor-elements', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify(labelData)
             });
         }
@@ -1432,6 +1517,7 @@ function closeDeskBookingModal() {
 }
 
 async function handleDeskBookingSubmit(e) {
+    console.log('===== handleDeskBookingSubmit CALLED =====');
     e.preventDefault();
     
     const deskId = document.getElementById('bookingDeskId').value;
@@ -1446,9 +1532,20 @@ async function handleDeskBookingSubmit(e) {
     if (teamId) localStorage.setItem('employeeTeamId', teamId);
     
     try {
+        // Get ID token for authentication
+        const token = window.getIdToken ? await window.getIdToken() : null;
+        
+        if (!token) {
+            showToast('Authentication required. Please refresh and sign in again.', 'error');
+            return;
+        }
+        
+        const headers = { 'Content-Type': 'application/json' };
+        headers['Authorization'] = `Bearer ${token}`;
+        
         const response = await fetch('/api/desk-bookings', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({
                 deskId,
                 date,
@@ -1502,7 +1599,17 @@ async function cancelDeskBooking(bookingId, deskId) {
     if (!confirm('Cancel this booking?')) return;
     
     try {
-        await fetch(`/api/desk-bookings/${bookingId}`, { method: 'DELETE' });
+        // Get ID token for authentication
+        const token = window.getIdToken ? await window.getIdToken() : null;
+        const headers = {};
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        await fetch(`/api/desk-bookings/${bookingId}`, { 
+            method: 'DELETE',
+            headers
+        });
         showToast('Booking cancelled', 'success');
         
         // Reload

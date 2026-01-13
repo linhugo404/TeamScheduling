@@ -158,7 +158,8 @@ function optionalAuth(req, res, next) {
     
     jwt.verify(token, getSigningKey, getVerifyOptions(), (err, decoded) => {
         if (err) {
-            req.user = { authenticated: false, reason: 'invalid_token' };
+            logger.warn('Token verification failed:', err.message);
+            req.user = { authenticated: false, reason: 'invalid_token', error: err.message };
             return next();
         }
         
@@ -172,6 +173,7 @@ function optionalAuth(req, res, next) {
             rawToken: decoded
         };
         
+        logger.debug('User authenticated:', req.user.email);
         next();
     });
 }

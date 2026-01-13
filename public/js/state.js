@@ -16,6 +16,7 @@ export const state = {
     viewers: [],
     myName: null,
     myUserId: null,
+    myPhoto: null, // Azure AD user photo
     currentRoom: null,
     bookingsCache: {} // "locationId:year-month" -> { bookings: [], fetchedAt: Date }
 };

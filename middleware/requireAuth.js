@@ -23,12 +23,19 @@ function requireAuthForWrites(req, res, next) {
     
     // Skip auth requirement if not enabled
     if (!REQUIRE_AUTH_FOR_WRITES) {
+        logger.debug(`Auth not required (REQUIRE_AUTH=${process.env.REQUIRE_AUTH})`);
         return next();
     }
     
     // Check if user is authenticated
     if (!req.user || !req.user.authenticated) {
-        logger.warn(`Unauthorized write attempt: ${req.method} ${req.originalUrl}`);
+        logger.warn(`Unauthorized write attempt: ${req.method} ${req.originalUrl}`, {
+            hasUser: !!req.user,
+            authenticated: req.user?.authenticated,
+            reason: req.user?.reason,
+            error: req.user?.error,
+            hasAuthHeader: !!req.headers.authorization
+        });
         return res.status(401).json({
             error: 'Authentication required for this operation',
             code: 'AUTH_REQUIRED'
@@ -36,6 +43,7 @@ function requireAuthForWrites(req, res, next) {
     }
     
     // User is authenticated, proceed
+    logger.debug(`Authenticated request: ${req.method} ${req.originalUrl} by ${req.user.email}`);
     next();
 }
 

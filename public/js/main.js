@@ -34,7 +34,7 @@ import {
     handleDragStart, handleDragEnd, handleDragOver, 
     handleDragLeave, handleDrop 
 } from './dragdrop.js';
-import { addToGoogleCalendar, addToOutlookCalendar, downloadICS } from './calendar-sync.js';
+import { addToOutlookCalendar, downloadICS } from './calendar-sync.js';
 import { switchView, setupSettingsSubmenu, toggleMobileMenu, closeMobileMenu } from './views.js';
 import { 
     initTeamRolesView, toggleTeamRole, openManagerSelector, 
@@ -271,7 +271,6 @@ window.openTeamModal = openTeamModal;
 window.deleteHoliday = deleteHoliday;
 
 // Calendar Sync
-window.addToGoogleCalendar = addToGoogleCalendar;
 window.addToOutlookCalendar = addToOutlookCalendar;
 window.downloadICS = downloadICS;
 

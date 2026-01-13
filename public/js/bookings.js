@@ -124,9 +124,21 @@ export function renderDayBookings(dateStr) {
                             </svg>
                         </button>
                         <div class="calendar-sync-buttons">
-                            <button class="btn-icon" onclick="addToGoogleCalendar('${escapeHtml(booking.id)}')" title="Add to Google Calendar">G</button>
-                            <button class="btn-icon" onclick="addToOutlookCalendar('${escapeHtml(booking.id)}')" title="Add to Outlook">O</button>
-                            <button class="btn-icon" onclick="downloadICS('${escapeHtml(booking.id)}')" title="Download .ics">📅</button>
+                            <button class="btn-icon" onclick="addToOutlookCalendar('${escapeHtml(booking.id)}')" title="Add to Outlook Calendar">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                                </svg>
+                            </button>
+                            <button class="btn-icon" onclick="downloadICS('${escapeHtml(booking.id)}')" title="Download Calendar File (.ics)">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                            </button>
                         </div>
                     </div>
                 </div>

@@ -261,6 +261,50 @@ function renderCalendarList(year, month, monthBookings, capacity, today, isLoadi
 }
 
 /**
+ * Render skeleton calendar for loading state
+ */
+export function renderSkeletonCalendar() {
+    const grid = elements.calendarGrid;
+    if (!grid) return;
+    
+    const year = state.currentDate.getFullYear();
+    const month = state.currentDate.getMonth();
+    
+    // Update month display
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                        'July', 'August', 'September', 'October', 'November', 'December'];
+    if (elements.currentMonth) {
+        elements.currentMonth.textContent = `${monthNames[month]} ${year}`;
+    }
+    
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const startingDay = firstDay.getDay();
+    const totalDays = lastDay.getDate();
+    
+    let html = '';
+    
+    // Empty cells for days before the first day of the month
+    const adjustedStartDay = startingDay === 0 ? 6 : startingDay - 1;
+    for (let i = 0; i < adjustedStartDay; i++) {
+        html += '<div class="calendar-day empty"></div>';
+    }
+    
+    // Skeleton days
+    for (let day = 1; day <= totalDays; day++) {
+        const date = new Date(year, month, day);
+        const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+        
+        let classes = ['calendar-day', 'skeleton'];
+        if (isWeekend) classes.push('weekend');
+        
+        html += `<div class="${classes.join(' ')}"></div>`;
+    }
+    
+    grid.innerHTML = html;
+}
+
+/**
  * Navigate to previous/next month
  */
 export async function navigateMonth(delta) {
@@ -285,8 +329,9 @@ export async function navigateMonth(delta) {
     // Update month while content is off-screen
     state.currentDate.setMonth(state.currentDate.getMonth() + delta);
     
-    // Render new content (still off-screen due to outClass)
-    renderCalendar(true);
+    // Show skeleton loader
+    grid?.classList.add('calendar-skeleton');
+    renderSkeletonCalendar();
     
     // Switch from out to in animation
     grid?.classList.remove(outClass);
@@ -312,8 +357,14 @@ export async function navigateMonth(delta) {
  * Go to today's date
  */
 export async function goToToday() {
+    const grid = elements.calendarGrid;
+    
     state.currentDate = new Date();
-    renderCalendar(true);
+    
+    // Show skeleton loader
+    grid?.classList.add('calendar-skeleton');
+    renderSkeletonCalendar();
+    
     joinCurrentRoom();
     await loadBookingsForMonth();
     renderCalendar(false);

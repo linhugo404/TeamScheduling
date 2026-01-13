@@ -8,7 +8,7 @@
 // Import all modules
 import { state, elements, initElements } from './state.js';
 import { loadTheme, toggleTheme } from './theme.js';
-import { initSocket, joinCurrentRoom } from './socket.js';
+import { initSocket, joinCurrentRoom, simulateNewUser } from './socket.js';
 import { loadData, loadBookingsForMonth, invalidateBookingsCache } from './api.js';
 import { renderCalendar, navigateMonth, goToToday, renderSkeletonCalendar } from './calendar.js';
 import { 
@@ -297,6 +297,9 @@ window.selectManager = selectManager;
 
 // Theme
 window.toggleTheme = toggleTheme;
+
+// Testing/Development
+window.simulateNewUser = simulateNewUser;
 
 // Export initApp for auth.js to call
 window.initApp = initApp;

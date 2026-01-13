@@ -7,6 +7,8 @@ import { state } from './state.js';
 import { stringToColor, escapeHtml } from './utils.js';
 
 let socket = null;
+let previousViewerIds = new Set(); // Track previous viewers for animation
+let viewersJustRemoved = false; // Track if viewers were just removed for reverse bump
 
 /**
  * Initialize Socket.IO connection
@@ -139,8 +141,6 @@ export function joinCurrentRoom() {
 
 /**
  * Render presence indicators (viewers)
- * Only shows users viewing the current month (filtered by room)
- * Includes the current user in the list
  */
 export function renderViewers() {
     const container = document.getElementById('presenceAvatars');
@@ -161,12 +161,7 @@ export function renderViewers() {
         });
     }
     
-    // Filter viewers to only show those in the current room (current month)
-    const currentRoomViewers = allViewers.filter(v => {
-        // Viewers are already filtered by room on the server, but double-check
-        return true; // All viewers in state.viewers are for the current room
-    });
-    
+    const currentRoomViewers = allViewers;
     const totalViewers = currentRoomViewers.length;
     const maxShow = 3;
     const shown = currentRoomViewers.slice(0, maxShow);
@@ -174,11 +169,7 @@ export function renderViewers() {
     
     // Update count
     if (countElement) {
-        if (totalViewers === 0) {
-            countElement.textContent = '';
-        } else {
-            countElement.textContent = totalViewers;
-        }
+        countElement.textContent = totalViewers === 0 ? '' : totalViewers;
     }
     
     if (totalViewers === 0) {
@@ -186,31 +177,60 @@ export function renderViewers() {
         return;
     }
     
-    // Render visible avatars (with photos if available)
-    let html = shown.map(v => {
-        if (v.photo) {
-            return `
-                <div class="presence-avatar presence-avatar-photo" title="${escapeHtml(v.name)}">
-                    <img src="${escapeHtml(v.photo)}" alt="${escapeHtml(v.name)}" loading="lazy">
-                </div>
-            `;
-        } else {
-            return `
-                <div class="presence-avatar" style="background: ${escapeHtml(v.color)}" title="${escapeHtml(v.name)}">
-                    ${escapeHtml(v.name.charAt(0).toUpperCase())}
-                </div>
-            `;
+    // Detect new and removed viewers for animation
+    const currentViewerIds = new Set(currentRoomViewers.map(v => v.id));
+    const newViewerIds = new Set();
+    const removedViewerIds = new Set();
+    
+    // Find new viewers
+    currentViewerIds.forEach(id => {
+        if (!previousViewerIds.has(id)) {
+            newViewerIds.add(id);
         }
+    });
+    
+    // Find removed viewers
+    previousViewerIds.forEach(id => {
+        if (!currentViewerIds.has(id)) {
+            removedViewerIds.add(id);
+        }
+    });
+    
+    // Check animation states
+    const hasNewViewers = newViewerIds.size > 0;
+    const hasRemovedViewers = removedViewerIds.size > 0 || viewersJustRemoved;
+    
+    // Reset the flag after using it
+    viewersJustRemoved = false;
+    
+    previousViewerIds = currentViewerIds;
+    
+    // Render visible avatars
+    let html = shown.map(v => {
+        const isNew = newViewerIds.has(v.id);
+        // Determine animation class based on what happened
+        let cls = '';
+        if (isNew) {
+            cls = ' new-viewer';
+        } else if (hasNewViewers) {
+            cls = ' bumped'; // Bump left when someone joins
+        } else if (hasRemovedViewers) {
+            cls = ' bumped-right'; // Bump right when someone leaves
+        }
+        
+        if (v.photo) {
+            return `<div class="presence-avatar presence-avatar-photo${cls}" title="${escapeHtml(v.name)}" data-user-id="${escapeHtml(v.id)}"><img src="${escapeHtml(v.photo)}" alt="${escapeHtml(v.name)}" loading="lazy"></div>`;
+        }
+        return `<div class="presence-avatar${cls}" style="background: ${escapeHtml(v.color)}" title="${escapeHtml(v.name)}" data-user-id="${escapeHtml(v.id)}">${escapeHtml(v.name.charAt(0).toUpperCase())}</div>`;
     }).join('');
     
-    // Add overflow indicator if there are more users
     if (overflow > 0) {
-        html += `<div class="presence-avatar presence-overflow" title="${overflow} more viewer${overflow > 1 ? 's' : ''}">+${overflow}</div>`;
+        html += `<div class="presence-avatar presence-overflow" title="${overflow} more">+${overflow}</div>`;
     }
     
     container.innerHTML = html;
     
-    // Create expanded view for hover (always create if there are any viewers)
+    // Create/update expanded view
     let expandedView = document.getElementById('presenceExpanded');
     if (!expandedView && totalViewers > 0) {
         expandedView = document.createElement('div');
@@ -219,57 +239,47 @@ export function renderViewers() {
         document.body.appendChild(expandedView);
     }
     
-    // Update expanded view content (show all viewers, even if 3 or fewer)
     if (expandedView && totalViewers > 0) {
         const expandedHtml = currentRoomViewers.map(v => {
-            const avatarHtml = v.photo 
-                ? `<div class="presence-avatar presence-avatar-photo"><img src="${escapeHtml(v.photo)}" alt="${escapeHtml(v.name)}" loading="lazy"></div>`
-                : `<div class="presence-avatar" style="background: ${escapeHtml(v.color)}">${escapeHtml(v.name.charAt(0).toUpperCase())}</div>`;
+            const isNew = newViewerIds.has(v.id);
+            // Determine animation class for expanded view
+            let cls = '';
+            if (isNew) {
+                cls = ' new-viewer';
+            } else if (hasNewViewers) {
+                cls = ' bumped'; // Bump up when someone joins
+            } else if (hasRemovedViewers) {
+                cls = ' bumped-down'; // Bump down when someone leaves
+            }
+            const avatar = v.photo 
+                ? `<div class="presence-avatar presence-avatar-photo${cls}"><img src="${escapeHtml(v.photo)}" alt="${escapeHtml(v.name)}" loading="lazy"></div>`
+                : `<div class="presence-avatar${cls}" style="background: ${escapeHtml(v.color)}">${escapeHtml(v.name.charAt(0).toUpperCase())}</div>`;
             
-            return `
-                <div class="presence-expanded-item">
-                    ${avatarHtml}
-                    <span class="presence-expanded-name">${escapeHtml(v.name)}</span>
-                </div>
-            `;
+            return `<div class="presence-expanded-item${cls}" data-user-id="${escapeHtml(v.id)}">${avatar}<span class="presence-expanded-name">${escapeHtml(v.name)}</span></div>`;
         }).join('');
         expandedView.innerHTML = expandedHtml;
     }
     
-    // Setup hover handlers (always setup if there are viewers)
+    // Setup hover handlers
     const presenceBar = document.getElementById('presenceBar');
     if (presenceBar && expandedView && totalViewers > 0) {
-        // Remove existing handlers to avoid duplicates
-        const newShowHandler = () => showExpandedPresence();
-        const newHideHandler = () => hideExpandedPresence();
-        
-        // Store handlers on element for cleanup
         if (presenceBar._showHandler) {
             presenceBar.removeEventListener('mouseenter', presenceBar._showHandler);
             presenceBar.removeEventListener('mouseleave', presenceBar._hideHandler);
         }
         
-        presenceBar._showHandler = newShowHandler;
-        presenceBar._hideHandler = newHideHandler;
+        presenceBar._showHandler = () => showExpandedPresence();
+        presenceBar._hideHandler = () => hideExpandedPresence();
         
-        // Add new handlers
-        presenceBar.addEventListener('mouseenter', newShowHandler);
-        presenceBar.addEventListener('mouseleave', newHideHandler);
+        presenceBar.addEventListener('mouseenter', presenceBar._showHandler);
+        presenceBar.addEventListener('mouseleave', presenceBar._hideHandler);
         
-        // Also handle hover on expanded view itself
-        expandedView.addEventListener('mouseenter', () => {
-            expandedView.classList.add('visible');
-        });
-        expandedView.addEventListener('mouseleave', () => {
-            hideExpandedPresence();
-        });
+        expandedView.addEventListener('mouseenter', () => expandedView.classList.add('visible'));
+        expandedView.addEventListener('mouseleave', () => hideExpandedPresence());
     }
 }
 
-/**
- * Show expanded presence list on hover
- */
-function showExpandedPresence(e) {
+function showExpandedPresence() {
     const expanded = document.getElementById('presenceExpanded');
     const presenceBar = document.getElementById('presenceBar');
     if (!expanded || !presenceBar) return;
@@ -281,31 +291,49 @@ function showExpandedPresence(e) {
     expanded.classList.add('visible');
 }
 
-/**
- * Hide expanded presence list
- */
 function hideExpandedPresence() {
     const expanded = document.getElementById('presenceExpanded');
     if (!expanded) return;
     
-    // Delay hiding to allow moving mouse to expanded view
     setTimeout(() => {
         if (!expanded.matches(':hover') && !document.getElementById('presenceBar')?.matches(':hover')) {
             expanded.classList.remove('visible');
             setTimeout(() => {
-                if (!expanded.matches(':hover')) {
-                    expanded.style.display = 'none';
-                }
+                if (!expanded.matches(':hover')) expanded.style.display = 'none';
             }, 200);
         }
     }, 100);
 }
 
-/**
- * Handle real-time data changes
- */
+function animateViewerRemoval(userId, userName, callback) {
+    const container = document.getElementById('presenceAvatars');
+    const expandedView = document.getElementById('presenceExpanded');
+    
+    if (container) {
+        container.querySelectorAll('.presence-avatar').forEach(avatar => {
+            if (avatar.getAttribute('data-user-id') === userId || avatar.getAttribute('title') === userName) {
+                avatar.classList.add('removing-viewer');
+            }
+        });
+    }
+    
+    if (expandedView) {
+        expandedView.querySelectorAll('.presence-expanded-item').forEach(item => {
+            if (item.getAttribute('data-user-id') === userId) {
+                item.classList.add('removing-viewer');
+            }
+        });
+    }
+    
+    // Set flag so remaining avatars get bumped-right animation
+    setTimeout(() => {
+        viewersJustRemoved = true;
+        callback();
+    }, 500);
+}
+
 function handleDataChange(payload) {
-    const { type, booking, before } = payload;
+    const { type, booking } = payload;
     
     switch (type) {
         case 'booking:created':
@@ -319,9 +347,7 @@ function handleDataChange(payload) {
         case 'booking:updated':
         case 'booking:moved_out':
             const idx = state.bookings.findIndex(b => b.id === booking.id);
-            if (idx !== -1) {
-                state.bookings[idx] = booking;
-            }
+            if (idx !== -1) state.bookings[idx] = booking;
             window.renderCalendar?.();
             window.updateCapacityDisplay?.();
             break;
@@ -334,10 +360,39 @@ function handleDataChange(payload) {
     }
 }
 
-/**
- * Get socket instance
- */
 export function getSocket() {
     return socket;
 }
 
+export function simulateNewUser() {
+    const testUsers = [
+        { name: 'Alice Johnson', photo: 'https://i.pravatar.cc/150?img=1' },
+        { name: 'Bob Smith', photo: 'https://i.pravatar.cc/150?img=12' },
+        { name: 'Charlie Davis', photo: null },
+        { name: 'Diana Lee', photo: 'https://i.pravatar.cc/150?img=5' },
+        { name: 'Eve Martinez', photo: null }
+    ];
+    
+    const randomUser = testUsers[Math.floor(Math.random() * testUsers.length)];
+    const testUserId = 'test-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
+    
+    const newViewer = {
+        id: testUserId,
+        name: randomUser.name,
+        color: stringToColor(testUserId),
+        photo: randomUser.photo
+    };
+    
+    state.viewers.push(newViewer);
+    renderViewers();
+    console.log('✨ User joined:', randomUser.name);
+    
+    // Remove after 5 seconds with animation
+    setTimeout(() => {
+        animateViewerRemoval(testUserId, randomUser.name, () => {
+            state.viewers = state.viewers.filter(v => v.id !== testUserId);
+            renderViewers();
+            console.log('👋 User left:', randomUser.name);
+        });
+    }, 5000);
+}
